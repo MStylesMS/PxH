@@ -1,4 +1,5 @@
-# Agent / Copilot — PxH
+﻿# Copilot instructions — Paradox Health Monitor (PxH)
 
-Read [AI-INSTRUCTIONS.md](../AI-INSTRUCTIONS.md) and [docs/SPEC.md](../docs/SPEC.md).
-Suite context: [../../.github/copilot-instructions.md](../../.github/copilot-instructions.md).
+Read [AI-INSTRUCTIONS.md](../AI-INSTRUCTIONS.md) for the canonical project AI context.
+
+This file exists so VS Code Copilot auto-loads the same source of truth as Cursor (AGENTS.md) and Claude Code (CLAUDE.md).
