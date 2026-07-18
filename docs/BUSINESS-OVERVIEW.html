@@ -26,15 +26,18 @@
 <body>
   <header>
     <h1>Business overview — host health vs premium ops</h1>
-    <p class="sub">Opinions for review (2026-07-18). Links are relative to this file under
-      <code>apps/PxH/docs/</code> so they work from any machine that keeps the standard
-      <code>…/paradox/apps/…</code> and <code>…/paradox/rooms/…</code> layout.</p>
+    <p class="sub">Opinions for review (2026-07-18; display/UPS roadmap added later same day).
+      Links are relative to this file under <code>apps/PxH/docs/</code> so they work from any
+      machine that keeps the standard <code>…/paradox/apps/…</code> and
+      <code>…/paradox/rooms/…</code> layout.</p>
   </header>
   <main>
     <div class="verdict">
       <strong>Bottom line:</strong> Ship a focused <strong>PxH</strong> on every room Pi (disk, services,
       curated warnings, nginx+:19090 fallback). Keep exploration, fleet control, game history UX,
       IM push, and audit reports in <strong>PxP</strong> (mostly paid). Do not grow PxH into a second Hub.
+      Later: UPS telemetry in PxH; TV/monitor control primarily in PFx (PxH only if no PFx).
+      Power switching for loads uses existing WiZ/Shelly (etc.), not UPS outlet APIs first.
     </div>
 
     <h2>1. Product lanes</h2>
@@ -43,8 +46,14 @@
       <tbody>
         <tr>
           <td><a href="SPEC.md">PxH — Health Monitor</a></td>
-          <td>Always-on host beacon: disk, systemd, System Warnings/Journal/Props, IDE prune</td>
+          <td>Always-on host beacon: disk, systemd, System Warnings/Journal/Props, IDE prune;
+            later UPS telemetry; optional display only when PFx is absent</td>
           <td>Open / with suite (AGPL) — operational necessity</td>
+        </tr>
+        <tr>
+          <td><a href="../../PFx/docs/SPEC.md">PFx — media / screens</a></td>
+          <td>Primary owner of TV/monitor power &amp; HDMI presence when the machine runs media</td>
+          <td>Open runtime</td>
         </tr>
         <tr>
           <td><a href="../../PxP-Agent/docs/SPEC.md">PxP-Agent</a></td>
@@ -125,6 +134,27 @@
       inventing <code>PxP-Audit</code>. Sidecar JSON next to images for one-time AI results.
       Plan: <a href="pending/12-snapshots-and-audit.md">12</a>.</p>
 
+    <h3 id="display-tv">TV / monitor control &amp; reporting</h3>
+    <p class="verdict"><strong>One controller per machine.</strong> Prefer <strong>PFx</strong> when HDMI/media
+      zones exist (already owns the display path). Optional thin implementation in <strong>PxH</strong>
+      only on hosts without PFx (ops Pi, status screen). Shared MQTT contract later
+      (e.g. <code>paradox/&lt;id&gt;/display/…</code>); ini comments must say “disable if PFx is
+      installed.” Do not run both. Spec/plans deferred until we green-light implementation.</p>
+    <p class="muted">Business: strong demo / “room wakes for show” story; day-to-day use is medium on
+      media machines. Worth doing in PFx first; PxH fallback only if effort stays small.</p>
+
+    <h3 id="ups">UPS monitoring (and power switching)</h3>
+    <p class="verdict"><strong>PxH owns UPS telemetry</strong> (on AC / on battery, capacity, estimated
+      runtime, load) — same family as disk and host survival. Prefer NUT (or similar) rather than
+      vendor-specific USB stacks. MQTT + System Health card + low-battery / on-battery alerts.</p>
+    <p class="verdict"><strong>Outlet / load switching:</strong> do <em>not</em> depend on UPS
+      switched-outlet groups for MVP. Use <strong>existing smart switches</strong> (WiZ, Shelly, etc.
+      via PxB / already-built control) configured in the room. Native UPS outlet control may be listed
+      as a <em>future</em> option only. Soft shutdown / service stop on critical battery is more
+      valuable than flipping UPS outlets.</p>
+    <p class="muted">Business: infrequent day-to-day use, high trust when power fails; good
+      “production venue” sell signal for modest effort. Worth a PxH backlog slice after core health MVP.</p>
+
     <h2>3. Suggested implementation order</h2>
     <ol>
       <li>PxH P0: 01 → 03 → 04 (disk/services/serve)</li>
@@ -132,6 +162,8 @@
       <li>PxH P1: 05 UI panels; 07 PxD link; 08 boundaries</li>
       <li>Hygiene: 06 MQTT drifts; 09 lab coexistence</li>
       <li>Prime roadmap: 11 → 10 → 12</li>
+      <li><strong>Later / backlog:</strong> PFx display contract (+ optional PxH-only fallback);
+        PxH UPS telemetry + alerts; power loads via WiZ/Shelly config — not UPS outlet APIs first</li>
     </ol>
 
     <h2>4. Where to store cross-repo ideas</h2>

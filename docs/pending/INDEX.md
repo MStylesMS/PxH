@@ -20,6 +20,8 @@ they stay findable. See [BUSINESS-OVERVIEW.html](../BUSINESS-OVERVIEW.html) for 
 | [10](10-premium-notify-and-remote.md) | PxP (premium) | P2 | IM push + remote summary |
 | [11](11-gameplay-jsonl-history.md) | PxO → PxP UX | P2 | Game counter, JSONL richness, history UI |
 | [12](12-snapshots-and-audit.md) | PxO / PxP / go2rtc | P3 | Snapshots, people-count, daily audit |
+| — | PFx (+ optional PxH) | backlog | TV/monitor control — see [BUSINESS-OVERVIEW § display](../BUSINESS-OVERVIEW.html#display-tv) (no plan file yet) |
+| — | PxH (+ PxB switches) | backlog | UPS telemetry; load switching via WiZ/Shelly first — see [BUSINESS-OVERVIEW § UPS](../BUSINESS-OVERVIEW.html#ups) (no plan file yet) |
 
 **Where should cross-repo ideas live?**  
 Prefer **owner repo** `docs/pending/` (e.g. copy or move 11→`PxO/docs/pending`, 10→`PxP/docs/pending`)
