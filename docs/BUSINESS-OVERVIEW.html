@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paradox — Health, ops &amp; premium — business overview</title>
+  <style>
+    :root { --bg: #f6f4ef; --ink: #1c1b19; --muted: #5c574e; --card: #fff; --line: #d9d2c5; --accent: #0b5fff; }
+    body { margin: 0; font-family: "Source Serif 4", "Iowan Old Style", Georgia, serif; background: var(--bg); color: var(--ink); line-height: 1.45; }
+    header { padding: 2rem 1.5rem 1rem; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, #fff 0%, var(--bg) 100%); }
+    h1 { margin: 0 0 0.35rem; font-size: 1.75rem; }
+    .sub { color: var(--muted); max-width: 42rem; }
+    main { max-width: 52rem; padding: 1.25rem 1.5rem 3rem; }
+    h2 { margin-top: 1.75rem; font-size: 1.2rem; }
+    h3 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .verdict { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 0.85rem 1rem; margin: 0.75rem 0; }
+    ul { padding-left: 1.2rem; }
+    a { color: var(--accent); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.95rem; background: var(--card); }
+    th, td { border: 1px solid var(--line); padding: 0.45rem 0.55rem; text-align: left; vertical-align: top; }
+    th { background: #efeae0; }
+    .muted { color: var(--muted); font-size: 0.9rem; }
+    code { font-family: ui-monospace, Consolas, monospace; font-size: 0.88em; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Business overview — host health vs premium ops</h1>
+    <p class="sub">Opinions for review (2026-07-18). Links are relative to this file under
+      <code>apps/PxH/docs/</code> so they work from any machine that keeps the standard
+      <code>…/paradox/apps/…</code> and <code>…/paradox/rooms/…</code> layout.</p>
+  </header>
+  <main>
+    <div class="verdict">
+      <strong>Bottom line:</strong> Ship a focused <strong>PxH</strong> on every room Pi (disk, services,
+      curated warnings, nginx+:19090 fallback). Keep exploration, fleet control, game history UX,
+      IM push, and audit reports in <strong>PxP</strong> (mostly paid). Do not grow PxH into a second Hub.
+    </div>
+
+    <h2>1. Product lanes</h2>
+    <table>
+      <thead><tr><th>Lane</th><th>Job</th><th>Monetize?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><a href="SPEC.md">PxH — Health Monitor</a></td>
+          <td>Always-on host beacon: disk, systemd, System Warnings/Journal/Props, IDE prune</td>
+          <td>Open / with suite (AGPL) — operational necessity</td>
+        </tr>
+        <tr>
+          <td><a href="../../PxP-Agent/docs/SPEC.md">PxP-Agent</a></td>
+          <td>Authenticated remote management for Prime</td>
+          <td>Open agent, enables paid Prime</td>
+        </tr>
+        <tr>
+          <td><a href="../../PxP/docs/MQTT_MONITOR.md">PxP MQTT Monitor</a></td>
+          <td>MQTT Explorer–style topic tree for techs</td>
+          <td>Prime convenience (diagnose)</td>
+        </tr>
+        <tr>
+          <td>PxP Operate → Machine Health</td>
+          <td>Fleet view via agent</td>
+          <td>Prime</td>
+        </tr>
+        <tr>
+          <td>Game JSONL / history / audit / IM</td>
+          <td>Run records, owner reports, off-site notify</td>
+          <td>Data free on disk; <em>UX + AI + push</em> = paid Prime</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>2. Opinions (by topic)</h2>
+
+    <h3>Disk + IDE prune</h3>
+    <p class="verdict">Do this in PxH first (P0). The Agent22 outage is enough justification.
+      Plan: <a href="pending/01-disk-and-ide-prune.md">01</a>.</p>
+
+    <h3>App log retention</h3>
+    <p class="verdict">PxH cannot fix ENOSPC alone if PxO/Pio/PxT logs grow forever. Adopt a suite
+      retention contract (in-app keys + optional janitor timer for sparse installs).
+      Plan: <a href="pending/02-suite-log-retention.md">02</a>.</p>
+
+    <h3>Service monitoring</h3>
+    <p class="verdict">Config-listed systemd units only (required / optional / user). Three-ish states
+      are enough; do not duplicate per-app deep health. Plan: <a href="pending/03-service-health.md">03</a>.</p>
+
+    <h3>nginx vs own server</h3>
+    <p class="verdict"><strong>Both:</strong> nginx for nice URLs; PxH always on <code>:19090/ui</code> as fallback.
+      Do not hijack port 80 when nginx dies. Plan: <a href="pending/04-serve-path-and-fallback.md">04</a>.</p>
+
+    <h3>Warnings / journal / props / themes</h3>
+    <p class="verdict">Yes to all three panels. Warnings colored by app (ini); journal by severity;
+      props on <code>paradox/props</code>. Defaults 200/24h, 100/6h, 50/7d. Day/night/auto + toggle.
+      Plan: <a href="pending/05-ui-panels-and-themes.md">05</a> · sample
+      <a href="../config/pxh.example.ini">pxh.example.ini</a>.</p>
+
+    <h3>MQTT spelling / props</h3>
+    <p class="verdict">Canonical <code>/warnings</code> is healthy. Fix ESP32 <code>site/props</code>, SpyCatcher
+      heartbeat-on-props, and PxB <code>pzb/</code> docs. Plan: <a href="pending/06-mqtt-contract-drifts.md">06</a>.</p>
+
+    <h3>PxD landing</h3>
+    <p class="verdict">Optional System Health link in example <code>room.json</code> is enough.
+      Plan: <a href="pending/07-pxd-landing-link.md">07</a>.</p>
+
+    <h3>PxP / Agent overlap</h3>
+    <p class="verdict">Keep local PxH actions and remote agent actions; document lanes; avoid dual
+      disk-alert spam. Plan: <a href="pending/08-pxp-and-agent.md">08</a>.</p>
+
+    <h3>pi5-ssd Hub</h3>
+    <p class="verdict">Move the one-off off PxH defaults — do not special-case product for the lab Hub.
+      Plan: <a href="pending/09-pi5-ssd-coexistence.md">09</a>.</p>
+
+    <h3>Telegram / WhatsApp / remote webpage</h3>
+    <p class="verdict"><strong>Paid PxP</strong> (or a small always-on companion), not PxH. Tokens do not belong
+      on every store Pi. Plan: <a href="pending/10-premium-notify-and-remote.md">10</a>.</p>
+
+    <h3>Gameplay JSONL &amp; history</h3>
+    <p class="verdict">PxO already writes useful JSONL — extend with game counter + hint source + dedup.
+      Browsing/reporting/AI EDN edits = Prime features; raw files stay readable without Prime.
+      Plan: <a href="pending/11-gameplay-jsonl-history.md">11</a> ·
+      <a href="../../PxO/docs/SPEC.md">PxO SPEC</a>.</p>
+
+    <h3>Snapshots, people-count, daily audit</h3>
+    <p class="verdict">Valuable owner features; park behind paid Prime. Prefer on-demand reports before
+      inventing <code>PxP-Audit</code>. Sidecar JSON next to images for one-time AI results.
+      Plan: <a href="pending/12-snapshots-and-audit.md">12</a>.</p>
+
+    <h2>3. Suggested implementation order</h2>
+    <ol>
+      <li>PxH P0: 01 → 03 → 04 (disk/services/serve)</li>
+      <li>Suite P0: 02 (log retention) in parallel</li>
+      <li>PxH P1: 05 UI panels; 07 PxD link; 08 boundaries</li>
+      <li>Hygiene: 06 MQTT drifts; 09 lab coexistence</li>
+      <li>Prime roadmap: 11 → 10 → 12</li>
+    </ol>
+
+    <h2>4. Where to store cross-repo ideas</h2>
+    <div class="verdict">
+      <p><strong>Recommendation:</strong> Own the plan in the <em>implementing</em> app’s
+        <code>docs/pending/</code> (PxO for JSONL, PxP for premium notify/audit, PxH for host health).
+        Keep a short stub + link in <a href="pending/INDEX.md">PxH/docs/pending/INDEX.md</a> while
+        ideas are being triaged together.</p>
+      <p class="muted">A suite-root <code>paradox/docs/pending/</code> index is nice later if the
+        workspace itself becomes a versioned meta-repo; until then, owner-app pending + this index
+        is enough.</p>
+    </div>
+
+    <h2>5. Key document map</h2>
+    <ul>
+      <li><a href="SPEC.md">PxH SPEC</a> · <a href="API.md">PxH API</a> · <a href="pending/INDEX.md">Pending plans</a></li>
+      <li><a href="../../PxP/docs/MQTT_MONITOR.md">PxP MQTT Monitor</a> · <a href="../../PxP/docs/PARADOX_HEALTH_MONITOR.md">PxP pointer to PxH</a></li>
+      <li><a href="../../PxP-Agent/docs/SPEC.md">PxP-Agent SPEC</a></li>
+      <li><a href="../../PxO/docs/SPEC.md">PxO SPEC</a> (gameplay JSONL)</li>
+      <li><a href="../../../.github/copilot-instructions.md">Suite overview</a></li>
+    </ul>
+  </main>
+</body>
+</html>

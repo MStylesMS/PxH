@@ -1,280 +1,274 @@
 # Paradox Health Monitor (PxH) — Functional Specification
 
-_Status: draft / bootstrap from existing prototype_  
-_Last updated: 2026-07-17_  
-_Product name:_ **Paradox Health Monitor** (short: **PxH**). Earlier UI copy used “Machine Health”;
-an interim draft name was “Paradox Monitor (PxM)”.
+_Status: draft (documentation iteration — implementation deferred)_  
+_Last updated: 2026-07-18_  
+_Product:_ **Paradox Health Monitor** (**PxH**)
 
-> **Note on the acronym:** The former product **Paradox Hub** also used “PxH” and is now
-> **Paradox Prime (PxP)**. This repository and acronym **PxH** mean **Paradox Health Monitor** only.
+> Former **Paradox Hub** is now **Paradox Prime (PxP)**. This repo’s **PxH** means Health Monitor only.
+
+**Related:** [API.md](API.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.html)
 
 ---
 
-## 0. Provenance (what already exists)
+## 0. Provenance
 
-The start of this product already lives on some install trees as an informal **Machine Health** stack:
-
-| Piece | Location | Notes |
-|-------|----------|--------|
-| Health API | `/opt/paradox/scripts/health-api.js` | Node HTTP API on `:19090` |
-| Systemd unit | `paradox-health-api.service` | Present on lab host (`pi5-ssd`); **not** deployed on all store Pis (e.g. Agent22) |
-| Health UI | `/opt/paradox/html/pi5-ssd/health/index.html` | Title: “Machine Health”; polls `/health-api/metrics` |
-| Hub link | `/opt/paradox/html/pi5-ssd/index.html` | Card → `/health/` |
-| Nginx | `config/nginx-paradox.conf`, `config/houdini-nginx.conf` | `/health/` static + `/health-api/` proxy |
-| Docs mention | `scripts/README.md`, `docs/SETUP.md` | Describes launcher/health pages |
-
-This document treats that stack as the **prototype** for Paradox Health Monitor and defines the
-productization path into `apps/PxH`.
+Informal **Machine Health** prototype on some hosts (`health-api.js` on `:19090`,
+`paradox-health-api.service`, `/health/` HTML). Lab host **pi5-ssd** also has a one-off Hub —
+**out of product scope**, but must not collide with PxH defaults when both run for testing
+(see §12 and [pending/09-pi5-ssd-coexistence.md](pending/09-pi5-ssd-coexistence.md)).
 
 ---
 
 ## 1. Purpose
 
-Paradox Health Monitor (PxH) is a **host-local system health service** for Paradox room machines. It:
+PxH is the **host-local health beacon** on each Paradox room machine:
 
-1. Collects machine and Paradox-runtime health metrics.
-2. Serves a simple **System Health** web UI for operators.
-3. Publishes health/alerts over **MQTT** for dashboards, PxD, PxP, or remote ops.
-4. Optionally exposes safe operator actions (refresh, package upgrade, reboot, service controls,
-   IDE prune) already prototyped in `health-api.js` / specified below.
+1. Collect host metrics (CPU, RAM, temp, **disk**, apt, …).
+2. Monitor configured **systemd units** (Paradox apps + system deps + optional user services).
+3. Serve a **System Health** web UI (metrics cards + warning/journal/props panels).
+4. Publish health/disk/alerts on MQTT; **subscribe** to configured warning/prop topics for the UI.
+5. Offer gated maintenance: apt/npm clean, **IDE remote-server prune**, optional service restart.
 
-It is **not** a replacement for PFx/PxO game logic, PxD camera tooling, PxP’s Diagnose & Repair
-suite, or **pxp-agent** remote management. It is the always-on, low-dependency health beacon on
-each Pi.
+**Not** game logic, not PxD cameras, not PxP fleet Diagnose & Repair, not **pxp-agent**.
 
 ---
 
-## 2. Goals
+## 2. Goals / non-goals
 
-- Answer “is this room machine healthy?” from a browser on the LAN/Tailscale.
-- Surface that answer from game **landing pages** (PxD-generated index links).
-- Emit MQTT telemetry and threshold alerts so a full disk / dead service is visible before showtime.
-- Install cleanly as a **systemd service** on every Paradox host (combined, mirror, picture,
-  Agent22, etc.).
-- Stay small enough for 8–16 GB SD cards (no large IDE caches as part of the product).
+**Goals:** LAN/Tailscale “is this Pi healthy?”; disk/ENOSPC prevention; landing-page link; small
+footprint on 8–16 GB cards; installable on every host profile (only configured services matter).
 
----
-
-## 3. Non-goals (initial product)
-
-- Full MQTT message browser (see PxP `MQTT_MONITOR.md`).
-- Remote fleet orchestration UI (PxP / pxp-agent territory).
-- Unrestricted filesystem cleanup outside the defined IDE prune / apt / npm cache actions (§7.1–7.2).
-  Media and room configs are never auto-deleted.
+**Non-goals (PxH):** MQTT Explorer-style browsing (→ PxP MQTT Monitor); fleet orchestration
+(→ PxP + pxp-agent); game-run history / audit reports / people-counting / IM push (→ PxP/PxO
+plans — see [pending/INDEX.md](pending/INDEX.md)); unrestricted filesystem deletes.
 
 ---
 
-## 4. Current prototype behavior (as of 2026-07-17)
-
-### 4.1 Metrics (`GET /metrics`)
-
-Reported today (when API is running):
-
-- Host name, timestamp, uptime
-- CPU load (1/5/15), per-core %, SoC temperature
-- GPU memory (vcgencmd), GPU temp (same sensor where applicable)
-- RAM used / total / %
-- **Disk root (`diskRoot`)** — intended fields: `totalGb`, `usedGb`, `availableGb`, `usedPercent`
-- Apt updates available count
-- Sudo-without-password capability flag
-
-**Known defect:** on the lab host, `diskRoot` currently returns `null` because `readDiskRoot()`
-builds a broken `awk` command string. The Machine Health UI already has a Disk Used card and falls
-back to “n/a”. Fixing disk metrics is required before disk monitoring can be trusted.
-
-### 4.2 Runtime status (`GET /runtime`)
-
-Service/process summary used by the Control Hub (MQTT, OpenClaw gateway, PFx/PxO/PxB/PxT/PFxE,
-clock target, etc.). Broader than pure “machine health”; productization may split **host metrics**
-vs **runtime control** later.
-
-### 4.3 Actions (prototype)
-
-- `POST /actions/upgrade` — apt update/upgrade (sudo required)
-- `POST /actions/restart` — reboot host
-- `POST /actions/service` — start/stop/restart selected Paradox services
-- Additional hub helpers for PxC/PxT/PxB profile selection
-
-### 4.4 UI
-
-- Path: `/health/` (nginx alias to static HTML)
-- Auto-refresh ~15s
-- Cards for CPU, temp, GPU, RAM, disk, updates, uptime, host
-- Buttons: Refresh, Upgrade Packages, Restart Machine
-
-### 4.5 Deployment gaps
-
-- Agent22 (and likely other store installs) lack `health-api.js`, the systemd unit, nginx
-  `/health-api/` proxy, and landing-page System Health link.
-- Prototype naming was inconsistent (“Machine Health” vs interim “Paradox Monitor”).
-
----
-
-## 5. Target architecture
+## 3. Target architecture
 
 ```
-┌─────────────────────────────┐
-│  paradox-health.service     │  (systemd; Node — PxH)
-│  - collect metrics          │
-│  - HTTP API (:19090)        │
-│  - MQTT publisher           │
-└──────────┬──────────────────┘
-           │
-     ┌─────┴──────┐
-     │            │
-     ▼            ▼
- /health-api/   MQTT topics
-     │         paradox/<room-or-host>/system/...
-     ▼
- /health/  (static System Health UI)
-     ▲
-     │ link from
- PxD landing page / Control Hub
+                    ┌──────────────────────────────────────┐
+                    │  paradox-health.service (PxH / Node) │
+                    │  metrics · systemd probe · MQTT      │
+                    │  HTTP API (:19090 default)           │
+                    │  optional: serve UI itself           │
+                    └────────────┬─────────────────────────┘
+           ┌─────────────────────┼─────────────────────┐
+           ▼                     ▼                     ▼
+    LAN :19090/ui          nginx /health/         MQTT broker
+    (fallback path)        + /health-api/         pub: …/system/*
+                           (preferred)            sub: warnings, props, …
 ```
 
-**Install layout:**
-
-- App: `/opt/paradox/apps/PxH/`
-- Unit: `paradox-health.service` (compat alias `paradox-health-api.service` during migration)
-- Config: `/opt/paradox/config/pxh.ini` (MQTT broker, room/host id, thresholds, publish interval)
-- UI static: served as `/health/` (nginx → `PxH/public/` or `html/health/`)
-
----
-
-## 6. Functional requirements
-
-### 6.1 System service
-
-| ID | Requirement |
-|----|-------------|
-| S1 | Installable via Paradox install scripts; enabled on boot |
-| S2 | Runs as `paradox` user; restarts on failure |
-| S3 | Depends on `network-online.target`; MQTT publish soft-fails if broker down, retries |
-| S4 | Bound primarily to localhost; nginx exposes `/health-api/` |
-
-### 6.2 System Health page
-
-| ID | Requirement |
-|----|-------------|
-| U1 | Served at `/health/` (or `/system-health/`) on each game host |
-| U2 | Shows host metrics including **disk used % and free space** with warn/critical coloring |
-| U3 | Linked from Control Hub and from **PxD-generated game landing pages** as “System Health” |
-| U4 | Works on Tailscale hostnames (e.g. `http://agent22.story-geological.ts.net/health/`) |
-
-### 6.3 MQTT publication
-
-| ID | Requirement |
-|----|-------------|
-| M1 | Periodically publish retained host snapshot (JSON) |
-| M2 | Publish alert messages when thresholds crossed (edge-triggered + periodic reaffirm while critical) |
-| M3 | Topic scheme (proposed): `paradox/<id>/system/health`, `paradox/<id>/system/disk`, `paradox/<id>/system/alerts` where `<id>` is room slug or hostname from config |
-| M4 | Alert payload includes at least: `level`, `type`, `message`, metric values, ISO timestamp |
-
-### 6.4 Landing page integration (PxD)
-
-| ID | Requirement |
-|----|-------------|
-| L1 | Packager/landing config can include an optional external/manual site entry for System Health (e.g. `/health/` or absolute URL) |
-| L2 | Default room templates document how to enable the link |
-| L3 | Single-site redirect landings still allow a secondary health link where operators expect a menu |
+| Path | Role |
+|------|------|
+| App | `/opt/paradox/apps/PxH/` |
+| Config | `/opt/paradox/config/pxh.ini` (name conventional, not mandatory) |
+| Unit | `paradox-health.service` |
+| Operator UI URL | Prefer `http://<host>/health/` via nginx; **always** also reachable at `http://<host>:19090/ui/` so health remains visible if nginx is down |
 
 ---
 
-## 7. Future additions
+## 4. Configuration (`pxh.ini`)
 
-### 7.1 Disk space monitoring & reporting _(priority — motivated by Agent22 2026-07-17 outage)_
+Single INI drives machine id, thresholds, service lists, MQTT pub/sub, UI panels, themes, history
+limits. Full sample: [config/pxh.example.ini](../config/pxh.example.ini).
 
-**Incident summary:** Agent22’s root filesystem filled to 100% (remote IDE server caches + apt/npm
-caches on a 15 GB card). PxO crashed with `ENOSPC` while writing logs; systemd entered
-restart-rate-limit failure. PFx logged MPV `SIGTERM` during service restarts — a secondary symptom,
-not the root cause.
+Key sections (summary):
 
-**Add to Paradox Health Monitor:**
+| Section | Purpose |
+|---------|---------|
+| `[server]` | bind host/port, `serve_ui`, optional `lan_bind` for fallback |
+| `[machine]` | `id` (MQTT `<id>`), display hostname |
+| `[thresholds]` | disk warn/critical % and free-GB floors |
+| `[services]` | required / optional / user-defined systemd units to probe |
+| `[mqtt]` | broker, publish interval, topic base |
+| `[warnings]` | topic patterns, colors, history limits → **System Warnings** panel |
+| `[journal]` | enable, unit filters, history, severity colors |
+| `[props]` | announce topic(s) (default `paradox/props`), history |
+| `[ui]` | theme `day` / `night` / `auto`, refresh interval |
+| `[actions]` | gate upgrade/reboot/service/cleanup/prune |
+| `[prune]` | IDE prune schedule / low-disk trigger |
+
+---
+
+## 5. Disk space monitoring _(MVP — in scope)_
+
+Motivated by Agent22 2026-07-17 (root FS 100%: IDE caches + apt/npm on small card → PxO `ENOSPC`).
 
 | ID | Requirement |
 |----|-------------|
-| D1 | Fix and continuously report root filesystem usage (`df /`) in API, UI, and MQTT |
-| D2 | Configurable thresholds (defaults: **warn ≥ 85%**, **critical ≥ 95%**, or free-GB floors for small cards) |
-| D3 | MQTT alert on threshold cross; retained disk snapshot for dashboards |
-| D4 | Health UI disk card: used %, used/total GB, free GB, color bands (good/warn/critical) |
-| D5 | Optional “top consumers” diagnostic (e.g. `~/.vscode-server`, `~/.cursor-server`, `~/.npm`, `/var/cache/apt`, `/opt/paradox/logs`) — read-only listing for operators |
-| D6 | Optional safe cleanup actions (gated, confirm in UI): `apt-get clean`, `npm cache clean`, and **IDE remote-server prune** (§7.2) — never delete media or room configs automatically |
-| D7 | Document store-Pi policy: avoid leaving multiple Cursor/VS Code remote server versions on production cards; prefer ≥32 GB media where practical |
+| D1 | Continuously report root usage (`diskRoot`: total/used/available GB + usedPercent) in API, UI, MQTT — never silently `null` when `/` is readable |
+| D2 | Thresholds default **warn ≥ 85%**, **critical ≥ 95%**, optional free-GB floors |
+| D3 | MQTT alert on threshold cross + periodic reaffirm while critical; retained disk snapshot |
+| D4 | UI disk card with good/warn/critical bands |
+| D5 | Optional read-only “top consumers” listing (IDE caches, apt, npm, `/opt/paradox/logs`) |
+| D6 | Gated cleanup: `apt-get clean`, `npm cache clean`, IDE prune (§6) — never auto-delete media/room configs |
+| D7 | Document store-Pi policy: prune IDE leftovers; prefer ≥32 GB where practical |
 
-### 7.2 Prune IDE remote servers _(maintenance — beyond monitoring)_
+**Suite companion (not PxH-only):** apps that log under `/opt/paradox/logs` must enforce retention.
+Today only PFx/PxO do partial startup cleanup; Pio/PxT/PxB/PxP-Agent/etc. can grow unbounded —
+see [pending/02-suite-log-retention.md](pending/02-suite-log-retention.md).
 
-PxH should **maintain** free space on store Pis by pruning stale remote IDE server installs. This is
-the primary disk consumer that filled Agent22 (hundreds of MB per leftover build).
+---
 
-**Scan targets**
+## 6. IDE remote-server prune _(MVP maintenance)_
 
-| Path | Pattern |
+| Scan | Pattern |
 |------|---------|
 | Cursor | `~/.cursor-server/bin/linux-arm64/*` |
-| VS Code | `~/.vscode-server/cli/servers/Stable-*` |
+| VS Code | `~/.vscode-server/cli/servers/Stable-*` (+ orphaned `code-*`, CachedExtensionVSIXs, reset `lru.json`) |
 
-**Keep / delete rules**
-
-1. Scan running processes for Cursor/VS Code server hashes (or build ids) currently in use.
-2. **Keep** any hash/build that appears in a running process.
-3. **Delete** all other matching server directories under the scan targets.
-4. Also remove orphaned `~/.vscode-server/code-*` binaries.
-5. Clear `~/.vscode-server/data/CachedExtensionVSIXs`.
-6. After pruning VS Code servers, reset `~/.vscode-server/cli/servers/lru.json` to `[]`.
-7. Optional: drop log dirs under `*/data/logs` older than ~7 days.
-
-**Operations**
+Rules: keep builds referenced by live processes; delete others; dry-run required; ~300–550 MB per
+stale build; run as `paradox`; never touch `/opt/paradox` media/apps/configs.
 
 | ID | Requirement |
 |----|-------------|
-| P1 | Implement as a PxH maintenance action (UI confirm + MQTT/log result) and/or a periodic systemd timer |
-| P2 | Default schedule: **weekly**, or **on-demand when free space is low** (e.g. after warn/critical disk threshold) |
-| P3 | Never delete a build still referenced by a live process; dry-run mode lists what would be removed |
-| P4 | Report bytes reclaimed and which builds were kept vs deleted in the action result / MQTT event |
-| P5 | Expectation: **~300–550 MB per stale build** recovered |
+| P1 | UI action + optional systemd timer / low-disk trigger |
+| P2 | Default weekly **or** when disk ≥ warn |
+| P3–P5 | Dry-run, bytes reclaimed report, MQTT/log result |
 
-**Safety notes**
-
-- Run as the `paradox` user (home dirs above are under `/home/paradox`).
-- Do not touch `/opt/paradox` media, configs, or app trees.
-- If no IDE remote session is active, pruning may remove *all* cached servers (acceptable on store
-  Pis; next remote connect re-downloads).
-
-### 7.3 Other backlog (non-blocking)
-
-- Inode exhaustion monitoring (`df -i`)
-- Journald disk usage
-- Per-service last-heartbeat from PFx/PxO discovery
-- Push bridge (Telegram / HA) from a central subscriber of `paradox/+/system/alerts`
-- Extract Control Hub service-control endpoints out of PxH into a dedicated ops API if the surface
-  grows too large
+Detail: [pending/01-disk-and-ide-prune.md](pending/01-disk-and-ide-prune.md).
 
 ---
 
-## 8. Acceptance criteria (MVP productization)
+## 7. Service / process health
 
-1. `paradox-health` (or current `paradox-health-api`) unit is active on a fresh Agent22-class install.
-2. `/health/` loads and shows non-null **disk** metrics.
-3. Crossing warn threshold publishes an MQTT alert within one publish interval.
-4. PxD landing page for Agent22 (or equivalent) includes a **System Health** link that reaches that page.
-5. Filling the disk no longer fails silently: operators see UI + MQTT before PxO dies with `ENOSPC`.
+PxH probes **systemd** (and optionally process heuristics) for units listed in config — per machine,
+so installs that omit PxB/PxT simply omit those units.
+
+| Tier | Examples | Behavior |
+|------|----------|----------|
+| **Required** | `mosquitto`, `nginx`, room Paradox units (`pfx`, `pxo`, …) | Failed/inactive → UI critical + optional MQTT alert |
+| **Optional** | `paradox-health` self, extras | Shown but soft |
+| **User-defined** | Operator-added unit names in `pxh.ini` | Same three-state model |
+
+**States (MVP):** `running` | `stopped` | `failed` | `unknown`  
+(“Running with errors” = `failed` or active-but-degraded when detectable, e.g. systemd `failed`
+result / restart rate-limit — do not invent deep app health checks; that stays in each app / PxP.)
+
+Plan: [pending/03-service-health.md](pending/03-service-health.md).
 
 ---
 
-## 9. Open decisions
+## 8. How the UI is served (nginx vs self)
 
-- Room id source: hostname vs `pfx.ini` / `pxo.ini` room prefix vs explicit `pxh.ini`.
-- Whether runtime service control stays in PxH or moves fully under PxP / Control Hub only.
-- ~~Branding~~ → **Resolved:** product is **Paradox Health Monitor (PxH)**; UI page title
-  **System Health**; nginx path remains `/health/`.
+**Decision (proposed):**
+
+1. **Primary:** nginx proxies `/health-api/` → `127.0.0.1:19090` and aliases `/health/` → static UI
+   (or proxies `/health/` → PxH `/ui/`).
+2. **Always-on fallback:** PxH binds API+UI on `:19090` (configurable). Operators bookmark
+   `http://<host>:19090/ui/` for when nginx itself is the patient.
+3. **Do not** dynamically “take over” port 80 if nginx dies — fighting for privileged ports as
+   `paradox` is fragile and unsafe. Detection of “nginx down /health broken” → highlight in UI
+   (when reached via :19090) and MQTT alert; optional Tailscale-only LAN bind.
+
+Plan: [pending/04-serve-path-and-fallback.md](pending/04-serve-path-and-fallback.md).
 
 ---
 
-## 10. Related references
+## 9. System Health UI
 
-- Prototype API: `/opt/paradox/scripts/health-api.js`
-- Prototype UI: `/opt/paradox/html/*/health/`
-- Nginx templates: venue `config/nginx-paradox.conf`, `config/houdini-nginx.conf`
-- PxD landing generation: `apps/PxD/scripts/package.js` (`buildLandingPage`)
-- PxP diagnose concepts: PxP `docs/MQTT_MONITOR.md`, `docs/SPEC.md` (fleet-level; complementary)
-- Remote management agent: [PxP-Agent](https://github.com/MStylesMS/PxP-Agent) (different job)
+### 9.1 Metrics cards
+
+Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, service summary strip.
+
+### 9.2 System Warnings (MQTT)
+
+Config-driven list of topic **patterns** (MQTT shared subscription / client wildcards). Each rule
+has a **color key** (app family). Messages append to a ring buffer shown in a text panel.
+
+**Default history:** last **200** lines **or** **24 hours**, whichever limit hits first
+(`warnings.history_lines=200`, `warnings.history_hours=24`) — operator-overridable in `pxh.ini`.
+
+Sample color keys (day/night CSS pairs — see §9.5): PFx/PFxE, PxO, Pio, PxB, PxT, game
+(`paradox/<room>/+/warnings`), default.
+
+### 9.3 Journal Messages
+
+**Separate panel — yes (proposed).** Source: `journalctl` for configured units (or `_SYSTEMD_UNIT`
+match list). Color by **severity** (emerg/alert/crit/err / warning / notice/info/debug) with fixed
+CSS — not per-app colors (severity is the useful axis for journals). Same history knobs default
+**100 lines / 6 hours**.
+
+### 9.4 Prop appearances
+
+Optional panel subscribed to `paradox/props` (and extras). Shows one-shot announce/arrival payloads.
+History default **50** lines / **7 days** (props appear rarely).
+
+### 9.5 Themes
+
+`ui.theme = day | night | auto` (auto = `prefers-color-scheme`) **plus** a header toggle.
+- Day: light/white background  
+- Night: dark grey background  
+Semantic colors (e.g. “red”) map to **dark-red on day** / **light-red on night** for contrast.
+
+Plan: [pending/05-ui-panels-and-themes.md](pending/05-ui-panels-and-themes.md).
+
+---
+
+## 10. MQTT publication (PxH → bus)
+
+| Topic | Retained | Content |
+|-------|----------|---------|
+| `paradox/<id>/system/health` | yes | Metrics snapshot |
+| `paradox/<id>/system/disk` | yes | diskRoot + level |
+| `paradox/<id>/system/services` | yes | Unit states summary |
+| `paradox/<id>/system/alerts` | no* | Threshold / service alerts |
+
+\* Last critical alert may be retained — open. Do **not** overload suite app `/warnings` topics;
+PxH system alerts stay under `…/system/alerts`.
+
+---
+
+## 11. PxD landing integration
+
+PxD landing / `room.json` should include an optional **System Health** link (path `/health/` or
+absolute `:19090/ui/`). Document in starter `room.json` as a commented or clearly optional entry
+operators can disable if PxH is absent.
+
+Plan: [pending/07-pxd-landing-link.md](pending/07-pxd-landing-link.md).
+
+---
+
+## 12. Boundaries: PxP, pxp-agent, pi5-ssd
+
+| Surface | Owner | Notes |
+|---------|-------|-------|
+| Host `/health/` beacon | **PxH** | This product |
+| Fleet Machine Health / pairing / remote service control | **PxP + pxp-agent** | Overlap in “service start/stop” — keep PxH local/LAN; PxP for multi-machine + auth |
+| MQTT Explorer-style topic tree | **PxP MQTT Monitor** | Not PxH ([MQTT_MONITOR.md](../../PxP/docs/MQTT_MONITOR.md)) |
+| pi5-ssd Hub + old health | Lab one-off | Relocate off `/health/` and `:19090` / avoid `…/system/*` if colliding |
+
+Plans: [08-pxp-and-agent.md](pending/08-pxp-and-agent.md), [09-pi5-ssd-coexistence.md](pending/09-pi5-ssd-coexistence.md).
+
+---
+
+## 13. Acceptance criteria (MVP)
+
+1. `paradox-health` active on Agent22-class install.  
+2. `/health/` **or** `:19090/ui/` shows non-null disk metrics with threshold colors.  
+3. Disk warn → MQTT `…/system/alerts` within one publish interval.  
+4. Configured required services show running/stopped/failed.  
+5. System Warnings panel shows live `/warnings` traffic from configured patterns.  
+6. IDE prune dry-run works; execute gated.  
+7. PxD starter docs/example include System Health link.  
+8. Theme day/night/auto + toggle.
+
+---
+
+## 14. Explicitly deferred (tracked outside MVP)
+
+Premium IM push, remote summary portal, game JSONL UX, snapshots, people-count audit, daily owner
+reports / “PxP-Audit” daemon — opinions and plans in [BUSINESS-OVERVIEW.html](BUSINESS-OVERVIEW.html)
+and [pending/INDEX.md](pending/INDEX.md).
+
+---
+
+## 15. Related references
+
+- API: [API.md](API.md)  
+- Example config: [../config/pxh.example.ini](../config/pxh.example.ini)  
+- Suite MQTT contract: `../../.github/copilot-instructions.md` (`…/warnings` plural)  
+- PxP-Agent: `../../PxP-Agent/docs/SPEC.md`  
+- PxO gameplay JSONL: `../../PxO/docs/SPEC.md` (Gameplay Analytics)

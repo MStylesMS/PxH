@@ -1,79 +1,120 @@
-# Paradox Health Monitor — HTTP API
+# Paradox Health Monitor — HTTP / MQTT API
 
-**Base URL (direct):** `http://127.0.0.1:19090`  
-**Via nginx (operators):** `http://<host>/health-api/`
+_Status: draft (docs iteration)_ · See [SPEC.md](SPEC.md)
 
-Bound primarily to localhost; nginx proxies `/health-api/` to the service.  
-Static System Health UI is served separately at `/health/` (not by this API process by default;
-dev mode may serve `public/`).
+**Direct (always):** `http://<host>:19090` (default; configurable)  
+**Via nginx (preferred):** `http://<host>/health-api/` → API; `http://<host>/health/` → UI  
 
-Functional context: [SPEC.md](SPEC.md).
+UI also at `http://<host>:19090/ui/` when `serve_ui=true` (fallback if nginx is down).
 
 ---
 
-## 1. Health and metrics
+## 1. Liveness and metrics
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/` or `/health` | Liveness `{ status: "ok", version }`. |
-| `GET` | `/metrics` | Host snapshot: hostname, timestamp, uptime, CPU load, temps, RAM, **diskRoot**, apt updates, sudo flag. |
-| `GET` | `/runtime` | Paradox runtime service/process summary (MQTT broker, PFx/PxO/… as configured). |
+| `GET` | `/` or `/health` | `{ status, version, name }` |
+| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel` |
+| `GET` | `/services` | Configured systemd units with `state`: `running`\|`stopped`\|`failed`\|`unknown` |
+| `GET` | `/runtime` | Alias or superset of `/services` for prototype compatibility |
 
-### `diskRoot` object (required for MVP)
+### `diskRoot` (required when `/` readable)
+
+```json
+{ "totalGb": 14.5, "usedGb": 12.1, "availableGb": 2.4, "usedPercent": 83.4 }
+```
+
+`diskLevel`: `ok` | `warn` | `critical` from `[thresholds]`.
+
+---
+
+## 2. UI data feeds (ring buffers)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/panels/warnings` | Recent MQTT warning lines (`lines`, `since` query) |
+| `GET` | `/panels/journal` | Recent journal lines for configured units |
+| `GET` | `/panels/props` | Recent `paradox/props` (etc.) announce messages |
+| `GET` | `/panels/meta` | Active theme recommendation, history limits, color map |
+
+WebSocket (optional MVP+): `WS /ws` subscribe to `warnings` | `journal` | `props` | `metrics`.
+
+Each warning line shape:
 
 ```json
 {
-  "totalGb": 14.5,
-  "usedGb": 12.1,
-  "availableGb": 2.4,
-  "usedPercent": 83.4
+  "ts": "2026-07-18T15:01:02Z",
+  "topic": "paradox/agent22/pfx/warnings",
+  "colorKey": "pfx",
+  "payload": { }
 }
 ```
 
-Must not be `null` when `/` is mounted and readable.
-
-### Threshold coloring (UI / alerts)
-
-Defaults from `pxh.ini` `[thresholds]`: warn ≥ 85% used, critical ≥ 95% used (or free-GB floors).
-
 ---
 
-## 2. Actions
+## 3. Actions
 
-All mutating actions should be gated (local network / future auth) and confirmation in the UI.
+Gated by `[actions]` in config; destructive bodies need `"confirm": true`.
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
-| `POST` | `/actions/upgrade` | optional | `apt-get update` + upgrade (sudo). |
-| `POST` | `/actions/restart` | `{ "confirm": true }` | Reboot host after short delay. |
-| `POST` | `/actions/service` | `{ "name", "action": "start"\|"stop"\|"restart" }` | Control allowlisted services. |
-| `POST` | `/actions/cleanup` | `{ "targets": ["apt","npm","ide"], "confirm": true, "dryRun"?: true }` | Safe cache cleanup (SPEC §7.1). |
-| `POST` | `/actions/prune-ide` | `{ "confirm": true, "dryRun"?: true }` | IDE remote-server prune (SPEC §7.2). |
-
-Action responses include `{ ok, message?, bytesReclaimed?, kept?, deleted? }` as applicable.
+| `POST` | `/actions/upgrade` | — | apt update/upgrade |
+| `POST` | `/actions/restart` | `{ "confirm": true }` | Host reboot (delayed) |
+| `POST` | `/actions/service` | `{ "name", "action" }` | start/stop/restart allowlisted unit |
+| `POST` | `/actions/cleanup` | `{ "targets", "confirm", "dryRun?" }` | apt/npm/ide clean |
+| `POST` | `/actions/prune-ide` | `{ "confirm", "dryRun?" }` | IDE server prune (SPEC §6) |
+| `GET` | `/actions/prune-ide/preview` | — | Dry-run inventory without POST |
 
 ---
 
-## 3. MQTT topics (publisher)
-
-Configured under `[mqtt]` in `pxh.ini`. Soft-fail and retry if broker down.
+## 4. MQTT — publish (PxH → broker)
 
 | Topic | Retained | Payload |
 |-------|----------|---------|
-| `paradox/<id>/system/health` | yes | Full metrics snapshot JSON |
-| `paradox/<id>/system/disk` | yes | `diskRoot` + threshold level |
-| `paradox/<id>/system/alerts` | no (or last alert retained — TBD) | `{ level, type, message, …, ts }` |
+| `paradox/<id>/system/health` | yes | metrics snapshot |
+| `paradox/<id>/system/disk` | yes | diskRoot + level |
+| `paradox/<id>/system/services` | yes | services array |
+| `paradox/<id>/system/alerts` | usually no | `{ level, type, message, …, ts }` |
 
-`<id>` = `machine_id` from config (room slug or hostname).
+`<id>` from `[machine] id`. Soft-fail if broker down.
 
 ---
 
-## 4. Errors
+## 5. MQTT — subscribe (broker → PxH panels)
 
-| Code | Typical cause |
-|------|----------------|
-| 400 | Missing `confirm` / invalid body |
-| 403 | Action not permitted (no sudo / not allowlisted) |
-| 404 | Unknown service name |
-| 500 | Collection or action failure |
-| 503 | Dependency unavailable (optional) |
+Configured in `[warnings]`, `[props]` (and optionally game wildcards). Canonical suite suffix is
+**`/warnings` (plural)** — see suite MQTT contract.
+
+Default patterns (example ini):
+
+- `paradox/+/pfx/warnings`, `paradox/+/pfxe/warnings` → color `pfx`
+- `paradox/+/pxo/warnings` → `pxo`
+- `paradox/+/pio/warnings` or configured pio topic → `pio`
+- `paradox/+/pxb/warnings`, `paradox/+/pxb/+/warnings` → `pxb`
+- `paradox/+/pxt/warnings` → `pxt`
+- `paradox/+/+/warnings` (game / catch-all) → `game` (lower priority than specific rules)
+- `paradox/props` → props panel (not warnings)
+
+---
+
+## 6. History defaults
+
+| Panel | Default lines | Default hours | Config keys |
+|-------|---------------|---------------|-------------|
+| Warnings | 200 | 24 | `warnings.history_lines`, `warnings.history_hours` |
+| Journal | 100 | 6 | `journal.history_lines`, `journal.history_hours` |
+| Props | 50 | 168 (7d) | `props.history_lines`, `props.history_hours` |
+
+Evict by whichever limit is hit first.
+
+---
+
+## 7. Errors
+
+| Code | Cause |
+|------|--------|
+| 400 | Missing confirm / bad body |
+| 403 | Action disabled or unit not allowlisted |
+| 404 | Unknown service |
+| 500 | Collection/action failure |
+| 503 | Optional dependency (e.g. journalctl unavailable) |

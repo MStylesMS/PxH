@@ -29,8 +29,10 @@ On a room Pi, nginx exposes `/health-api/` → API and `/health/` → static UI.
 
 | | |
 |---|---|
-| [Specification](docs/SPEC.md) | Purpose, architecture, requirements, disk/IDE prune |
+| [Specification](docs/SPEC.md) | Purpose, architecture, MVP requirements |
 | [HTTP / MQTT API](docs/API.md) | Endpoints and topics |
+| [Pending plans](docs/pending/INDEX.md) | Focused agent-ready plans (review before coding) |
+| [Business overview](docs/BUSINESS-OVERVIEW.html) | Product opinions & cross-repo map |
 
 ## License
 
