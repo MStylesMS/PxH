@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>System Health — Paradox Health Monitor</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --text: #e8eef4;
+      --muted: #8b9aab;
+      --ok: #3d9a6a;
+      --warn: #c4922a;
+      --crit: #c44a4a;
+      --accent: #5b8def;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, #1a2a3a, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      padding: 1.25rem 1.5rem 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    h1 { margin: 0; font-size: 1.35rem; font-weight: 650; letter-spacing: 0.02em; }
+    .brand { color: var(--muted); font-size: 0.85rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    button {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid #2c3a4a;
+      border-radius: 6px;
+      padding: 0.45rem 0.85rem;
+      cursor: pointer;
+    }
+    button:hover { border-color: var(--accent); }
+    button.danger { border-color: #6a3030; }
+    main {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 0.75rem;
+      padding: 1rem 1.5rem 2rem;
+    }
+    .card {
+      background: var(--panel);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      border: 1px solid #243140;
+    }
+    .card .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .card .value { font-size: 1.45rem; font-weight: 600; margin-top: 0.35rem; }
+    .card .sub { color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
+    .ok .value { color: var(--ok); }
+    .warn .value { color: var(--warn); }
+    .critical .value { color: var(--crit); }
+    footer { padding: 0 1.5rem 1.5rem; color: var(--muted); font-size: 0.8rem; }
+    #status { min-height: 1.2em; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>System Health</h1>
+      <div class="brand">Paradox Health Monitor (PxH)</div>
+    </div>
+    <div class="actions">
+      <button type="button" id="btn-refresh">Refresh</button>
+      <button type="button" id="btn-upgrade">Upgrade Packages</button>
+      <button type="button" class="danger" id="btn-reboot">Restart Machine</button>
+    </div>
+  </header>
+  <main id="cards"></main>
+  <footer>
+    <div id="status">Loading…</div>
+    <div>Auto-refresh every 15s · API <code id="api-base">/metrics</code></div>
+  </footer>
+  <script>
+    const API = (function resolveApi() {
+      // Prefer same-origin /health-api when behind nginx; else relative to this server (/ui → parent)
+      if (location.pathname.startsWith('/health')) return '/health-api';
+      return '';
+    })();
+
+    const cardsEl = document.getElementById('cards');
+    const statusEl = document.getElementById('status');
+
+    function levelClass(level) {
+      if (level === 'critical') return 'critical';
+      if (level === 'warn') return 'warn';
+      return 'ok';
+    }
+
+    function card(label, value, sub, cls) {
+      return `<article class="card ${cls || ''}"><div class="label">${label}</div>` +
+        `<div class="value">${value}</div>` +
+        (sub ? `<div class="sub">${sub}</div>` : '') +
+        `</article>`;
+    }
+
+    async function loadMetrics() {
+      try {
+        const res = await fetch(`${API}/metrics`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const m = await res.json();
+        const disk = m.diskRoot;
+        const diskCls = levelClass(m.diskLevel);
+        const diskVal = disk ? `${disk.usedPercent}%` : 'n/a';
+        const diskSub = disk
+          ? `${disk.usedGb} / ${disk.totalGb} GB · ${disk.availableGb} GB free`
+          : 'disk metrics unavailable';
+
+        cardsEl.innerHTML = [
+          card('Host', m.hostname || '—', m.timestamp),
+          card('Uptime', formatUptime(m.uptimeSeconds)),
+          card('CPU', `${m.cpuPercent}%`, `load ${m.load?.one} / ${m.load?.five} / ${m.load?.fifteen}`),
+          card('Temp', m.cpuTempC != null ? `${m.cpuTempC}°C` : 'n/a'),
+          card('GPU mem', m.gpuMemMb != null ? `${m.gpuMemMb} MB` : 'n/a'),
+          card('RAM', `${m.ram?.usedPercent}%`, `${m.ram?.usedMb} / ${m.ram?.totalMb} MB`),
+          card('Disk', diskVal, diskSub, diskCls),
+          card('Updates', m.aptUpdatesAvailable != null ? String(m.aptUpdatesAvailable) : 'n/a'),
+        ].join('');
+
+        statusEl.textContent = `Updated ${m.timestamp} · disk ${m.diskLevel}`;
+      } catch (err) {
+        statusEl.textContent = `Failed to load metrics: ${err.message}`;
+      }
+    }
+
+    function formatUptime(sec) {
+      if (sec == null) return '—';
+      const d = Math.floor(sec / 86400);
+      const h = Math.floor((sec % 86400) / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      return d > 0 ? `${d}d ${h}h` : `${h}h ${m}m`;
+    }
+
+    async function post(path, body) {
+      const res = await fetch(`${API}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      statusEl.textContent = data.message || (res.ok ? 'OK' : `Error ${res.status}`);
+      return data;
+    }
+
+    document.getElementById('btn-refresh').onclick = () => loadMetrics();
+    document.getElementById('btn-upgrade').onclick = () => {
+      if (confirm('Run apt update/upgrade on this machine?')) post('/actions/upgrade');
+    };
+    document.getElementById('btn-reboot').onclick = () => {
+      if (confirm('Reboot this machine in about one minute?')) {
+        post('/actions/restart', { confirm: true });
+      }
+    };
+
+    loadMetrics();
+    setInterval(loadMetrics, 15_000);
+  </script>
+</body>
+</html>
