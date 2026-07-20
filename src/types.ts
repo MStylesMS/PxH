@@ -40,6 +40,8 @@ export interface RuntimeServiceInfo {
   name: string;
   tier: ServiceTier;
   state: 'running' | 'stopped' | 'failed' | 'unknown';
+  /** systemd unit enabled at boot: enabled | disabled | static | masked | unknown */
+  enabled: 'enabled' | 'disabled' | 'static' | 'masked' | 'unknown';
   pid: number | null;
 }
 

@@ -74,6 +74,29 @@
       font-size: 0.85rem;
     }
     #banner.show { display: block; }
+    #activity {
+      display: none;
+      margin: 0.75rem 1.5rem 0;
+      padding: 0.75rem 1rem;
+      background: var(--panel);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      font-size: 0.9rem;
+    }
+    #activity.show { display: flex; align-items: center; gap: 0.75rem; }
+    #activity.done { border-color: var(--ok); }
+    #activity.error { border-color: var(--crit); }
+    .spinner {
+      width: 1rem; height: 1rem;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    #activity.done .spinner, #activity.error .spinner { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
     main.cards {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -92,25 +115,49 @@
     .ok .value { color: var(--ok); }
     .warn .value { color: var(--warn); }
     .critical .value { color: var(--crit); }
-    #services {
+    .services-wrap {
       padding: 0.5rem 1.5rem 1rem;
-      display: flex; flex-wrap: wrap; gap: 0.4rem;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #services {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.5rem;
+    }
+    @media (max-width: 900px) {
+      #services { grid-template-columns: 1fr; }
+    }
+    .svc-row {
+      display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.45rem 0.65rem;
+      min-width: 0;
     }
     .svc {
-      font-size: 0.75rem;
-      padding: 0.25rem 0.55rem;
+      font-size: 0.8rem;
+      padding: 0.2rem 0.5rem;
       border-radius: 4px;
       border: 1px solid var(--border);
-      background: var(--panel);
     }
     .svc.running { border-color: var(--ok); color: var(--ok); }
     .svc.failed, .svc.stopped.required { border-color: var(--crit); color: var(--crit); }
     .svc.stopped { color: var(--muted); }
+    .svc-row button {
+      padding: 0.25rem 0.55rem;
+      font-size: 0.72rem;
+    }
+    .svc-meta { color: var(--muted); font-size: 0.7rem; flex: 1 1 100%; }
     .panels {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 0.75rem;
       padding: 0 1.5rem 1.5rem;
+    }
+    @media (max-width: 900px) {
+      .panels { grid-template-columns: 1fr; }
     }
     .panel {
       background: var(--panel);
@@ -180,8 +227,12 @@
     </div>
   </header>
   <div id="banner"></div>
+  <div id="activity"><div class="spinner"></div><div id="activity-text"></div></div>
   <main class="cards" id="cards"></main>
-  <div id="services"></div>
+  <div class="services-wrap">
+    <h2>Services</h2>
+    <div id="services"></div>
+  </div>
   <section class="panels">
     <div class="panel">
       <h2>System Warnings</h2>
@@ -233,11 +284,53 @@
     let pendingAction = null;
     let ws = null;
     let pollTimer = null;
+    let actionBusy = false;
+    let activityTimer = null;
+    let activityStarted = 0;
+    let lastServices = [];
+
+    const ACTION_BTNS = ['btn-cleanup', 'btn-prune', 'btn-upgrade', 'btn-reboot'];
 
     const colorMap = {
       red: 'c-red', orange: 'c-orange', purple: 'c-purple',
       teal: 'c-teal', blue: 'c-blue', amber: 'c-amber', gray: 'c-gray',
     };
+
+    function setActionButtonsDisabled(disabled) {
+      for (const id of ACTION_BTNS) {
+        const el = document.getElementById(id);
+        if (el) el.disabled = disabled;
+      }
+      document.querySelectorAll('#services button').forEach((b) => { b.disabled = disabled; });
+    }
+
+    function showActivity(phase, message) {
+      const box = document.getElementById('activity');
+      const text = document.getElementById('activity-text');
+      box.classList.add('show');
+      box.classList.remove('done', 'error');
+      if (phase === 'start' || phase === 'progress') {
+        actionBusy = true;
+        setActionButtonsDisabled(true);
+        if (phase === 'start') {
+          activityStarted = Date.now();
+          if (activityTimer) clearInterval(activityTimer);
+          activityTimer = setInterval(() => {
+            const sec = Math.round((Date.now() - activityStarted) / 1000);
+            text.textContent = `${message} (${sec}s)`;
+          }, 500);
+        }
+        text.textContent = message + (activityStarted ? ` (${Math.round((Date.now() - activityStarted) / 1000)}s)` : '');
+      } else {
+        if (activityTimer) { clearInterval(activityTimer); activityTimer = null; }
+        const sec = activityStarted ? Math.round((Date.now() - activityStarted) / 1000) : 0;
+        actionBusy = false;
+        setActionButtonsDisabled(false);
+        box.classList.add(phase === 'error' ? 'error' : 'done');
+        text.textContent = sec ? `${message} · finished in ${sec}s` : message;
+        document.getElementById('status').textContent = message;
+      }
+    }
 
     function applyTheme(mode) {
       let effective = mode;
@@ -295,19 +388,61 @@
         card('Updates', m.aptUpdatesAvailable != null ? String(m.aptUpdatesAvailable) : 'n/a'),
         card('sudo', m.sudoNopasswd === true ? 'OK' : m.sudoNopasswd === false ? 'missing' : '?', 'NOPASSWD'),
       ].join('');
-      document.getElementById('status').textContent =
-        `Updated ${m.timestamp} · disk ${m.diskLevel}` +
-        (m.topConsumers?.length
-          ? ` · top: ${m.topConsumers.slice(0, 3).map((c) => `${c.label} ${c.sizeMb}MB`).join(', ')}`
-          : '');
+      if (!actionBusy) {
+        document.getElementById('status').textContent =
+          `Updated ${m.timestamp} · disk ${m.diskLevel}` +
+          (m.topConsumers?.length
+            ? ` · top: ${m.topConsumers.slice(0, 3).map((c) => `${c.label} ${c.sizeMb}MB`).join(', ')}`
+            : '');
+      }
     }
 
     function renderServices(data) {
       const list = data.services || data || [];
-      document.getElementById('services').innerHTML = list.map((s) => {
+      lastServices = list;
+      const el = document.getElementById('services');
+      el.innerHTML = list.map((s) => {
         const cls = [s.state, s.tier === 'required' ? 'required' : ''].filter(Boolean).join(' ');
-        return `<span class="svc ${cls}" title="${s.tier}">${s.name}: ${s.state}</span>`;
+        const en = s.enabled || 'unknown';
+        const self = s.name === 'paradox-health';
+        const dis = actionBusy ? 'disabled' : '';
+        const running = s.state === 'running';
+        // Start XOR Stop; Enable XOR Disable (skip boot toggle for static/masked/self-disable)
+        let runBtn = '';
+        if (running) {
+          runBtn = self
+            ? ''
+            : `<button type="button" data-act="stop" ${dis}>Stop</button>`;
+        } else {
+          runBtn = `<button type="button" data-act="start" ${dis}>Start</button>`;
+        }
+        const restartBtn = `<button type="button" data-act="restart" ${dis}>Restart</button>`;
+        let bootBtn = '';
+        if (en === 'enabled' && !self) {
+          bootBtn = `<button type="button" data-act="disable" ${dis}>Disable</button>`;
+        } else if (en === 'disabled') {
+          bootBtn = `<button type="button" data-act="enable" ${dis}>Enable</button>`;
+        }
+        return `<div class="svc-row" data-name="${escapeHtml(s.name)}">
+          <span class="svc ${cls}">${escapeHtml(s.name)}: ${escapeHtml(s.state)}</span>
+          ${runBtn}${restartBtn}${bootBtn}
+          <span class="svc-meta">${escapeHtml(s.tier)} · boot ${escapeHtml(en)}${s.pid ? ` · pid ${s.pid}` : ''}${self ? ' · (self)' : ''}</span>
+        </div>`;
       }).join('');
+    }
+
+    async function serviceAction(name, action) {
+      if (!(await ensureAuth())) return;
+      if (!confirm(`${action} service "${name}"?`)) return;
+      showActivity('start', `${action} ${name}…`);
+      const data = await postAction('/actions/service', { name, action }, { skipBusy: true });
+      if (data?.ok) {
+        showActivity('done', data.message || `${action} ${name} ok`);
+        const { data: svc } = await fetchJson('/services');
+        if (svc) renderServices(svc);
+      } else {
+        showActivity('error', data?.message || `${action} failed`);
+      }
     }
 
     function appendLines(elId, lines, mode) {
@@ -367,7 +502,7 @@
       });
     }
 
-    async function postAction(path, body) {
+    async function postAction(path, body, opts = {}) {
       if (!(await ensureAuth())) return;
       const { res, data } = await fetchJson(path, {
         method: 'POST',
@@ -375,11 +510,30 @@
       });
       if (res.status === 401) {
         authenticated = false;
-        if (await ensureAuth()) return postAction(path, body);
+        if (await ensureAuth()) return postAction(path, body, opts);
         return;
       }
-      document.getElementById('status').textContent = data.message || (res.ok ? 'OK' : `Error ${res.status}`);
+      if (!opts.skipBusy) {
+        document.getElementById('status').textContent = data.message || (res.ok ? 'OK' : `Error ${res.status}`);
+      }
       return data;
+    }
+
+    async function runLongAction(label, path, body, confirmMsg) {
+      if (confirmMsg && !confirm(confirmMsg)) return;
+      if (!(await ensureAuth())) return;
+      showActivity('start', label);
+      try {
+        const data = await postAction(path, body, { skipBusy: true });
+        if (!data) {
+          showActivity('error', 'Cancelled or auth failed');
+          return;
+        }
+        showActivity(data.ok === false ? 'error' : 'done', data.message || (data.ok === false ? 'Failed' : 'Done'));
+        return data;
+      } catch (e) {
+        showActivity('error', e.message || String(e));
+      }
     }
 
     function connectWs() {
@@ -404,6 +558,9 @@
           const msg = JSON.parse(ev.data);
           if (msg.channel === 'metrics') renderMetrics(msg.data);
           if (msg.channel === 'services') renderServices(msg.data);
+          if (msg.channel === 'action' && msg.data) {
+            showActivity(msg.data.phase, msg.data.message || '');
+          }
           if (msg.channel === 'warnings') {
             const lines = msg.data.lines || (msg.data.ts ? [msg.data] : []);
             if (msg.data.lines) appendLines('log-warnings', lines, 'warnings');
@@ -456,17 +613,24 @@
     }
 
     async function checkNginxBanner() {
-      if (location.port === '19090' || location.port === '') {
-        try {
-          const r = await fetch('/health/', { method: 'HEAD', cache: 'no-store' });
-          if (!r.ok) throw new Error('bad');
-        } catch {
-          if (location.port === '19090') {
-            const b = document.getElementById('banner');
-            b.textContent = 'nginx /health/ unreachable — using :19090 fallback';
-            b.classList.add('show');
-          }
+      // Only when using the :19090 fallback. Probe via same-origin API —
+      // browser fetch to :80 from :19090 is cross-origin and fails CORS.
+      if (location.port !== '19090') return;
+      const b = document.getElementById('banner');
+      try {
+        const { res, data } = await fetchJson('/reachability/nginx-health');
+        if (res.ok && data.ok) {
+          b.classList.remove('show');
+          b.textContent = '';
+          return;
         }
+        throw new Error(data.message || 'unreachable');
+      } catch (e) {
+        b.textContent =
+          'Preferred URL http://' +
+          location.hostname +
+          '/health/ is unreachable — using :19090 fallback';
+        b.classList.add('show');
       }
     }
 
@@ -499,26 +663,66 @@
       if (pendingAction) { pendingAction(true); pendingAction = null; }
     };
 
+    document.getElementById('services').addEventListener('click', (ev) => {
+      const btn = ev.target.closest('button[data-act]');
+      if (!btn || btn.disabled) return;
+      const row = btn.closest('.svc-row');
+      if (!row) return;
+      void serviceAction(row.dataset.name, btn.dataset.act);
+    });
+
     document.getElementById('btn-upgrade').onclick = async () => {
-      if (confirm('Run apt update/upgrade on this machine?')) postAction('/actions/upgrade');
+      await runLongAction(
+        'Upgrade: starting…',
+        '/actions/upgrade',
+        {},
+        'Run apt-get update + apt-get upgrade on this machine?\n\nThis can take several minutes. Progress will show above.',
+      );
+      void pollOnce();
     };
     document.getElementById('btn-reboot').onclick = async () => {
-      if (confirm('Reboot this machine in about one minute?')) {
-        postAction('/actions/restart', { confirm: true });
-      }
+      await runLongAction(
+        'Scheduling reboot…',
+        '/actions/restart',
+        { confirm: true },
+        'Reboot this machine in about one minute?',
+      );
     };
     document.getElementById('btn-cleanup').onclick = async () => {
-      if (confirm('Clean apt + npm caches?')) {
-        postAction('/actions/cleanup', { targets: ['apt', 'npm'], confirm: true });
-      }
+      await runLongAction(
+        'Cleanup: starting…',
+        '/actions/cleanup',
+        { targets: ['apt', 'npm'], confirm: true },
+        'Cleanup clears disk caches only:\n\n' +
+          '• apt-get clean — downloaded .deb archives\n' +
+          '• npm cache clean — npm package cache\n\n' +
+          'It does NOT delete media, room configs, or /opt/paradox apps.\n\nContinue?',
+      );
+      void pollOnce();
     };
     document.getElementById('btn-prune').onclick = async () => {
       if (!(await ensureAuth())) return;
-      const { data: preview } = await fetchJson('/actions/prune-ide/preview');
-      const msg = preview.message || 'Dry-run done';
-      if (confirm(`${msg}\n\nExecute prune now?`)) {
-        postAction('/actions/prune-ide', { confirm: true, dryRun: false });
+      showActivity('start', 'IDE prune: scanning (dry-run)…');
+      const preview = await postAction('/actions/prune-ide', { dryRun: true, confirm: false }, { skipBusy: true });
+      if (!preview) {
+        showActivity('error', 'Preview failed or cancelled');
+        return;
       }
+      showActivity('done', preview.message || 'Dry-run done');
+      const detail = [
+        preview.message || 'Dry-run done',
+        preview.deleted?.length != null ? `Would remove ${preview.deleted.length} path(s)` : '',
+        preview.bytesReclaimed != null ? `~${Math.round(preview.bytesReclaimed / 1e6)} MB` : '',
+        '',
+        'Execute prune now? (deletes stale Cursor/VS Code server builds only)',
+      ].filter(Boolean).join('\n');
+      if (!confirm(detail)) return;
+      await runLongAction(
+        'IDE prune: deleting stale builds…',
+        '/actions/prune-ide',
+        { confirm: true, dryRun: false },
+      );
+      void pollOnce();
     };
 
     (async function init() {

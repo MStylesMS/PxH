@@ -10,5 +10,7 @@ paradox ALL=(root) NOPASSWD: /usr/bin/apt-get clean
 paradox ALL=(root) NOPASSWD: /usr/bin/systemctl start *
 paradox ALL=(root) NOPASSWD: /usr/bin/systemctl stop *
 paradox ALL=(root) NOPASSWD: /usr/bin/systemctl restart *
+paradox ALL=(root) NOPASSWD: /usr/bin/systemctl enable *
+paradox ALL=(root) NOPASSWD: /usr/bin/systemctl disable *
 paradox ALL=(root) NOPASSWD: /sbin/shutdown -r +1 *
 paradox ALL=(root) NOPASSWD: /usr/sbin/shutdown -r +1 *

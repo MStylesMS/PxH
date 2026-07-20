@@ -19,7 +19,7 @@ sudo bash scripts/install.sh
 The installer:
 
 1. Syncs the app tree to `/opt/paradox/apps/PxH`
-2. Runs `npm install --omit=dev` and `npm run build`
+2. Runs `npm install`, `npm run build`, then `npm prune --omit=dev`
 3. Writes `/opt/paradox/config/pxh.ini` from the example if missing
 4. Installs `paradox-health.service` and enables it
 5. Installs `/etc/sudoers.d/paradox-health` (NOPASSWD allowlist for maintenance actions)

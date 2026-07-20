@@ -27,7 +27,8 @@ PxH is the **host-local health beacon** on each Paradox room machine:
 2. Monitor configured **systemd units** (Paradox apps + system deps + optional user services).
 3. Serve a **System Health** web UI (metrics cards + warning/journal/props panels).
 4. Publish health/disk/alerts on MQTT; **subscribe** to configured warning/prop topics for the UI.
-5. Offer gated maintenance: apt/npm clean, **IDE remote-server prune**, optional service restart.
+5. Offer gated maintenance: apt/npm clean, **IDE remote-server prune**, optional service
+   start/stop/restart/enable/disable.
 
 **Not** game logic, not PxD cameras, not PxP fleet Diagnose & Repair, not **pxp-agent**.
 
@@ -149,7 +150,11 @@ never touch `/opt/paradox` media/apps/configs.
 | **Optional** | `paradox-health` self, extras | Shown but soft |
 | **User-defined** | Operator-added unit names in `pxh.ini` | Same state model |
 
-**States:** `running` | `stopped` | `failed` | `unknown`
+**States:** `running` | `stopped` | `failed` | `unknown`  
+**Boot:** `enabled` | `disabled` | `static` | `masked` | `unknown` (from `systemctl is-enabled`)
+
+**UI controls (session required):** contextual Start/Stop, Restart, and Enable/Disable.
+Stop/Disable of `paradox-health` itself is refused (would take down the UI).
 
 ---
 
@@ -160,8 +165,10 @@ never touch `/opt/paradox` media/apps/configs.
 1. **Primary:** nginx proxies `/health-api/` → `127.0.0.1:19090` and aliases `/health/` → static UI
    (or proxies `/health/` → PxH `/ui/`).
 2. **Always-on fallback:** PxH binds API+UI on `:19090` (default `0.0.0.0`).
-3. **Do not** auto-bind :80/:443 when nginx fails. When UI is loaded via `:19090`, probe nginx
-   `/health/` and show a degraded banner if unreachable.
+3. **Do not** auto-bind :80/:443 when nginx fails. When UI is loaded via `:19090`, the page
+   calls `GET /reachability/nginx-health` (server-side probe of `http://127.0.0.1/health/`) and
+   shows a degraded banner if unreachable — browser cross-origin fetch to port 80 from `:19090`
+   is unreliable.
 
 ---
 
@@ -169,7 +176,8 @@ never touch `/opt/paradox` media/apps/configs.
 
 ### 9.1 Metrics cards
 
-Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, service summary strip.
+Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, plus a **Services** grid
+(same ~⅓ width cards as the warning panels) with contextual unit controls.
 
 ### 9.2 System Warnings (MQTT)
 

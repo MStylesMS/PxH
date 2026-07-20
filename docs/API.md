@@ -18,8 +18,9 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 |--------|------|-------------|
 | `GET` | `/` or `/health` | `{ status, version, name }` |
 | `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel`, optional `topConsumers` |
-| `GET` | `/services` | Configured systemd units with `state`, `tier` |
+| `GET` | `/services` | Configured systemd units with `state`, `tier`, `enabled` |
 | `GET` | `/runtime` | Alias of `/services` (prototype compatibility) |
+| `GET` | `/reachability/nginx-health` | Server-side check that `http://127.0.0.1/health/` is up (used by `:19090` UI banner) |
 
 ### `diskRoot` (required when `/` readable)
 
@@ -87,10 +88,10 @@ Require valid session cookie. Gated by `[actions]` flags; destructive bodies nee
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
-| `POST` | `/actions/upgrade` | — | apt update/upgrade |
+| `POST` | `/actions/upgrade` | — | apt update + upgrade (long-running; progress on WS `action`) |
 | `POST` | `/actions/restart` | `{ "confirm": true }` | Host reboot (delayed) |
-| `POST` | `/actions/service` | `{ "name", "action" }` | start/stop/restart allowlisted unit |
-| `POST` | `/actions/cleanup` | `{ "targets", "confirm", "dryRun?" }` | apt/npm/ide clean |
+| `POST` | `/actions/service` | `{ "name", "action" }` | `start`\|`stop`\|`restart`\|`enable`\|`disable` allowlisted unit |
+| `POST` | `/actions/cleanup` | `{ "targets", "confirm", "dryRun?" }` | Clears **apt** package archives and/or **npm** cache (and optional **ide** prune). Does **not** delete media, room configs, or `/opt/paradox` apps. |
 | `POST` | `/actions/prune-ide` | `{ "confirm", "dryRun?" }` | IDE server prune (SPEC §6) |
 | `GET` | `/actions/prune-ide/preview` | — | Dry-run inventory (session required) |
 

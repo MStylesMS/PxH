@@ -64,6 +64,24 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
     }
   };
 
+  /** Action progress goes to every connected WS client (no subscribe required). */
+  const broadcastAction = (data: {
+    phase: 'start' | 'progress' | 'done' | 'error';
+    name: string;
+    message: string;
+  }) => {
+    const msg = JSON.stringify({ channel: 'action', data });
+    for (const c of wsClients) {
+      if (c.socket.readyState === 1) {
+        try {
+          c.socket.send(msg);
+        } catch {
+          /* */
+        }
+      }
+    }
+  };
+
   deps.mqtt.onPanel((channel, line) => broadcast(channel, line));
 
   // Periodic metrics/services/journal for WS subscribers
@@ -111,6 +129,27 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
   app.get('/runtime', async () => ({
     services: await getRuntimeServices(cfg),
   }));
+
+  /** Server-side probe of nginx /health/ (avoids browser cross-origin from :19090). */
+  app.get('/reachability/nginx-health', async () => {
+    try {
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 3000);
+      const r = await fetch('http://127.0.0.1/health/', {
+        method: 'GET',
+        signal: controller.signal,
+        redirect: 'manual',
+      });
+      clearTimeout(t);
+      return { ok: r.ok || r.status === 200, status: r.status };
+    } catch (e) {
+      return {
+        ok: false,
+        status: 0,
+        message: e instanceof Error ? e.message : String(e),
+      };
+    }
+  });
 
   // ── Auth ────────────────────────────────────────────────────────────
   app.post<{ Body: { username?: string; password?: string } }>('/auth/login', async (req, reply) => {
@@ -240,7 +279,15 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
   // ── Actions (session required) ──────────────────────────────────────
   app.post('/actions/upgrade', async (req, reply) => {
     if (!requireSession(req, reply, cfg)) return;
-    const result = await runUpgrade(cfg);
+    broadcastAction({ phase: 'start', name: 'upgrade', message: 'Upgrade started…' });
+    const result = await runUpgrade(cfg, (step) =>
+      broadcastAction({ phase: 'progress', name: 'upgrade', message: step }),
+    );
+    broadcastAction({
+      phase: result.ok ? 'done' : 'error',
+      name: 'upgrade',
+      message: result.message,
+    });
     return reply.code(result.ok ? 200 : 403).send(result);
   });
 
@@ -254,12 +301,31 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
     if (!requireSession(req, reply, cfg)) return;
     const name = req.body?.name;
     const action = req.body?.action;
-    if (!name || !action || !['start', 'stop', 'restart'].includes(action)) {
-      return reply
-        .code(400)
-        .send({ ok: false, message: 'name and action (start|stop|restart) required' });
+    const allowed = ['start', 'stop', 'restart', 'enable', 'disable'] as const;
+    if (!name || !action || !(allowed as readonly string[]).includes(action)) {
+      return reply.code(400).send({
+        ok: false,
+        message: 'name and action (start|stop|restart|enable|disable) required',
+      });
     }
-    const result = await runServiceAction(cfg, name, action as 'start' | 'stop' | 'restart');
+    broadcastAction({
+      phase: 'start',
+      name: 'service',
+      message: `${action} ${name}…`,
+    });
+    const result = await runServiceAction(
+      cfg,
+      name,
+      action as 'start' | 'stop' | 'restart' | 'enable' | 'disable',
+    );
+    broadcastAction({
+      phase: result.ok ? 'done' : 'error',
+      name: 'service',
+      message: result.message,
+    });
+    if (result.ok) {
+      broadcast('services', { services: await getRuntimeServices(cfg) });
+    }
     return reply.code(result.ok ? 200 : 403).send(result);
   });
 
@@ -267,13 +333,20 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
     '/actions/cleanup',
     async (req, reply) => {
       if (!requireSession(req, reply, cfg)) return;
-      const targets = req.body?.targets ?? ['apt'];
+      const targets = req.body?.targets ?? ['apt', 'npm'];
+      broadcastAction({ phase: 'start', name: 'cleanup', message: 'Cleanup started…' });
       const result = await runCleanup(
         cfg,
         targets,
         Boolean(req.body?.confirm),
         Boolean(req.body?.dryRun),
+        (step) => broadcastAction({ phase: 'progress', name: 'cleanup', message: step }),
       );
+      broadcastAction({
+        phase: result.ok ? 'done' : 'error',
+        name: 'cleanup',
+        message: result.message,
+      });
       return reply.code(result.ok ? 200 : 400).send(result);
     },
   );
@@ -282,11 +355,23 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
     '/actions/prune-ide',
     async (req, reply) => {
       if (!requireSession(req, reply, cfg)) return;
+      const dryRun = Boolean(req.body?.dryRun);
+      broadcastAction({
+        phase: 'start',
+        name: 'prune-ide',
+        message: dryRun ? 'IDE prune dry-run started…' : 'IDE prune started…',
+      });
       const result = await runPruneIdeAction(
         cfg,
         Boolean(req.body?.confirm),
-        Boolean(req.body?.dryRun),
+        dryRun,
+        (step) => broadcastAction({ phase: 'progress', name: 'prune-ide', message: step }),
       );
+      broadcastAction({
+        phase: result.ok ? 'done' : 'error',
+        name: 'prune-ide',
+        message: result.message,
+      });
       if (result.ok) deps.mqtt.publishPruneResult(result);
       return reply.code(result.ok ? 200 : 400).send(result);
     },
@@ -294,7 +379,19 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
 
   app.get('/actions/prune-ide/preview', async (req, reply) => {
     if (!requireSession(req, reply, cfg)) return;
-    const result = await runPruneIdeAction(cfg, false, true);
+    broadcastAction({
+      phase: 'start',
+      name: 'prune-ide',
+      message: 'IDE prune preview (dry-run)…',
+    });
+    const result = await runPruneIdeAction(cfg, false, true, (step) =>
+      broadcastAction({ phase: 'progress', name: 'prune-ide', message: step }),
+    );
+    broadcastAction({
+      phase: result.ok ? 'done' : 'error',
+      name: 'prune-ide',
+      message: result.message,
+    });
     return reply.code(result.ok ? 200 : 400).send(result);
   });
 

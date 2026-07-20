@@ -27,6 +27,8 @@ Point `broker` at a remote URL when Mosquitto is not local. Soft-fails if the br
 
 Trim `[services] required` / `optional` / `user` to units that exist on this host. Missing units show as `unknown`, not a crash.
 
+After login, each unit shows contextual **Start** or **Stop**, **Restart**, and **Enable** or **Disable**. Prefer the nginx URL `http://<host>/health/` once `/health/` and `/health-api/` are merged into the venue site config.
+
 ## 4. Bind / viewing
 
 Default `host = 0.0.0.0` so LAN and Tailscale clients can **view** metrics without login.
