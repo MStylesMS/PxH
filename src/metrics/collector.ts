@@ -1,12 +1,13 @@
 /**
- * Host metrics — disk root is a first-class field when / is readable (never silent null on Pi).
+ * Host metrics — disk root is a first-class field when / is readable.
  */
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { hostname as osHostname, loadavg } from 'node:os';
+import { hostname as osHostname, loadavg, homedir } from 'node:os';
+import { resolve } from 'node:path';
 import si from 'systeminformation';
-import type { DiskRoot, MetricsSnapshot, PxhConfig, ThresholdLevel } from '../types.js';
+import type { DiskRoot, MetricsSnapshot, PxhConfig, ThresholdLevel, TopConsumer } from '../types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -73,12 +74,16 @@ async function readCpuTemp(): Promise<number | null> {
   try {
     const t = await si.cpuTemperature();
     if (t.main != null && Number.isFinite(t.main)) return round1(t.main);
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
   try {
     const { stdout } = await execFileAsync('vcgencmd', ['measure_temp']);
     const m = stdout.match(/temp=([\d.]+)/);
     if (m) return round1(Number(m[1]));
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
   return null;
 }
 
@@ -87,7 +92,9 @@ async function readGpuMemMb(): Promise<number | null> {
     const { stdout } = await execFileAsync('vcgencmd', ['get_mem', 'gpu']);
     const m = stdout.match(/(\d+)M/);
     if (m) return Number(m[1]);
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
   return null;
 }
 
@@ -104,8 +111,48 @@ async function aptUpdateCount(): Promise<number | null> {
   }
 }
 
-export async function collectMetrics(cfg: PxhConfig): Promise<MetricsSnapshot> {
-  const [load, mem, time, diskRoot, cpuTemp, gpuMem, aptUpdates] = await Promise.all([
+async function checkSudoNopasswd(): Promise<boolean | null> {
+  if (process.platform !== 'linux') return null;
+  try {
+    await execFileAsync('sudo', ['-n', 'true'], { timeout: 5_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function dirSizeMb(path: string): Promise<number | null> {
+  try {
+    const { stdout } = await execFileAsync('du', ['-sm', path], { timeout: 30_000 });
+    const n = Number(stdout.trim().split(/\s+/)[0]);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function readTopConsumers(): Promise<TopConsumer[]> {
+  const home = homedir();
+  const candidates: Array<{ path: string; label: string }> = [
+    { path: resolve(home, '.cursor-server'), label: 'Cursor server' },
+    { path: resolve(home, '.vscode-server'), label: 'VS Code server' },
+    { path: '/var/cache/apt', label: 'apt cache' },
+    { path: resolve(home, '.npm'), label: 'npm cache' },
+    { path: '/opt/paradox/logs', label: 'paradox logs' },
+  ];
+  const out: TopConsumer[] = [];
+  for (const c of candidates) {
+    const sizeMb = await dirSizeMb(c.path);
+    if (sizeMb != null) out.push({ path: c.path, label: c.label, sizeMb });
+  }
+  return out.sort((a, b) => (b.sizeMb ?? 0) - (a.sizeMb ?? 0));
+}
+
+export async function collectMetrics(
+  cfg: PxhConfig,
+  opts?: { topConsumers?: boolean },
+): Promise<MetricsSnapshot> {
+  const [load, mem, time, diskRoot, cpuTemp, gpuMem, aptUpdates, sudoNopasswd] = await Promise.all([
     si.currentLoad(),
     si.mem(),
     si.time(),
@@ -113,12 +160,13 @@ export async function collectMetrics(cfg: PxhConfig): Promise<MetricsSnapshot> {
     readCpuTemp(),
     readGpuMemMb(),
     aptUpdateCount(),
+    checkSudoNopasswd(),
   ]);
 
   const [one, five, fifteen] = loadavg();
   const usedPercent = mem.total > 0 ? (mem.used / mem.total) * 100 : 0;
 
-  return {
+  const snap: MetricsSnapshot = {
     hostname: cfg.machine.hostname || osHostname(),
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.round(time.uptime),
@@ -135,6 +183,11 @@ export async function collectMetrics(cfg: PxhConfig): Promise<MetricsSnapshot> {
     diskRoot,
     diskLevel: diskLevel(diskRoot, cfg.thresholds),
     aptUpdatesAvailable: aptUpdates,
-    sudoNopasswd: null,
+    sudoNopasswd,
   };
+
+  if (opts?.topConsumers) {
+    snap.topConsumers = await readTopConsumers();
+  }
+  return snap;
 }

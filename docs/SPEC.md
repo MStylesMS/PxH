@@ -1,12 +1,12 @@
 # Paradox Health Monitor (PxH) — Functional Specification
 
-_Status: draft (documentation iteration — implementation deferred)_  
-_Last updated: 2026-07-18_  
+_Status: MVP_  
+_Last updated: 2026-07-19_  
 _Product:_ **Paradox Health Monitor** (**PxH**)
 
 > Former **Paradox Hub** is now **Paradox Prime (PxP)**. This repo’s **PxH** means Health Monitor only.
 
-**Related:** [API.md](API.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.html)
+**Related:** [API.md](API.md) · [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.html)
 
 ---
 
@@ -50,55 +50,66 @@ plans — see [pending/INDEX.md](pending/INDEX.md)); unrestricted filesystem del
                     ┌──────────────────────────────────────┐
                     │  paradox-health.service (PxH / Node) │
                     │  metrics · systemd probe · MQTT      │
-                    │  HTTP API (:19090 default)           │
+                    │  HTTP + WS API (:19090 default)      │
                     │  optional: serve UI itself           │
                     └────────────┬─────────────────────────┘
-           ┌─────────────────────┼─────────────────────┐
-           ▼                     ▼                     ▼
-    LAN :19090/ui          nginx /health/         MQTT broker
-    (fallback path)        + /health-api/         pub: …/system/*
-                           (preferred)            sub: warnings, props, …
+           ┌─────────────────────┼─────────────────────────┐
+           ▼                     ▼                         ▼
+    LAN :19090/ui          nginx /health/             MQTT broker
+    (fallback path)        + /health-api/             pub: …/system/*
+                           (preferred)                sub: warnings, props, …
 ```
 
 | Path | Role |
 |------|------|
 | App | `/opt/paradox/apps/PxH/` |
-| Config | `/opt/paradox/config/pxh.ini` (name conventional, not mandatory) |
+| Config | `/opt/paradox/config/pxh.ini` |
 | Unit | `paradox-health.service` |
-| Operator UI URL | Prefer `http://<host>/health/` via nginx; **always** also reachable at `http://<host>:19090/ui/` so health remains visible if nginx is down |
+| Operator UI URL | Prefer `http://<host>/health/` via nginx; **always** also reachable at `http://<host>:19090/ui/` |
+
+Default bind: `0.0.0.0:19090` (LAN/Tailscale viewing). HTTPS belongs on nginx if the venue already has certs; PxH itself serves HTTP.
 
 ---
 
 ## 4. Configuration (`pxh.ini`)
 
 Single INI drives machine id, thresholds, service lists, MQTT pub/sub, UI panels, themes, history
-limits. Full sample: [config/pxh.example.ini](../config/pxh.example.ini).
-
-Key sections (summary):
+limits, auth, prune. Full sample: [config/pxh.example.ini](../config/pxh.example.ini).
 
 | Section | Purpose |
 |---------|---------|
-| `[server]` | bind host/port, `serve_ui`, optional `lan_bind` for fallback |
+| `[server]` | bind host/port (`0.0.0.0` default), `serve_ui` |
 | `[machine]` | `id` (MQTT `<id>`), display hostname |
 | `[thresholds]` | disk warn/critical % and free-GB floors |
 | `[services]` | required / optional / user-defined systemd units to probe |
-| `[mqtt]` | broker, publish interval, topic base |
+| `[mqtt]` | broker, `topic_root` (default `paradox`), optional `topic_base` override, interval |
 | `[warnings]` | topic patterns, colors, history limits → **System Warnings** panel |
 | `[journal]` | enable, unit filters, history, severity colors |
 | `[props]` | announce topic(s) (default `paradox/props`), history |
 | `[ui]` | theme `day` / `night` / `auto`, refresh interval |
-| `[actions]` | gate upgrade/reboot/service/cleanup/prune |
-| `[prune]` | IDE prune schedule / low-disk trigger |
+| `[actions]` | gates, `session_hours`, `allowed_users` |
+| `[prune]` | `schedule` (`weekly` \| `low_disk` \| `manual_only`), `interval_hours` |
 
 ---
 
-## 5. Disk space monitoring _(MVP — in scope)_
+## 4.1 Auth model
 
-Motivated by Agent22 2026-07-17 (root FS 100%: IDE caches + apt/npm on small card → PxO `ENOSPC`).
+- **View** (metrics, panels, WebSocket): open on the trusted LAN/Tailscale network.
+- **Actions** (apt, cleanup, service control, reboot, IDE prune preview/execute): require PAM
+  authentication against a **local OS username/password**, then an httpOnly session cookie
+  (default 12 hours). Optional `allowed_users` allowlist.
+- Do not invent a separate PxH password store. Network is considered safe; this gate stops guests.
+
+Sudoers: install [config/sudoers.paradox-health](../config/sudoers.paradox-health) so user `paradox`
+can run the allowlisted maintenance commands without a password prompt. See [INSTALL.md](INSTALL.md).
+
+---
+
+## 5. Disk space monitoring _(MVP)_
 
 | ID | Requirement |
 |----|-------------|
-| D1 | Continuously report root usage (`diskRoot`: total/used/available GB + usedPercent) in API, UI, MQTT — never silently `null` when `/` is readable |
+| D1 | Continuously report root usage (`diskRoot`) in API, UI, MQTT — never silently `null` when `/` is readable |
 | D2 | Thresholds default **warn ≥ 85%**, **critical ≥ 95%**, optional free-GB floors |
 | D3 | MQTT alert on threshold cross + periodic reaffirm while critical; retained disk snapshot |
 | D4 | UI disk card with good/warn/critical bands |
@@ -106,64 +117,51 @@ Motivated by Agent22 2026-07-17 (root FS 100%: IDE caches + apt/npm on small car
 | D6 | Gated cleanup: `apt-get clean`, `npm cache clean`, IDE prune (§6) — never auto-delete media/room configs |
 | D7 | Document store-Pi policy: prune IDE leftovers; prefer ≥32 GB where practical |
 
-**Suite companion (not PxH-only):** apps that log under `/opt/paradox/logs` must enforce retention.
-Today only PFx/PxO do partial startup cleanup; Pio/PxT/PxB/PxP-Agent/etc. can grow unbounded —
-see [pending/02-suite-log-retention.md](pending/02-suite-log-retention.md).
+Suite log retention remains a companion track: [pending/02-suite-log-retention.md](pending/02-suite-log-retention.md).
 
 ---
 
-## 6. IDE remote-server prune _(MVP maintenance)_
+## 6. IDE remote-server prune _(MVP)_
 
 | Scan | Pattern |
 |------|---------|
 | Cursor | `~/.cursor-server/bin/linux-arm64/*` |
 | VS Code | `~/.vscode-server/cli/servers/Stable-*` (+ orphaned `code-*`, CachedExtensionVSIXs, reset `lru.json`) |
 
-Rules: keep builds referenced by live processes; delete others; dry-run required; ~300–550 MB per
-stale build; run as `paradox`; never touch `/opt/paradox` media/apps/configs.
+Rules: keep builds referenced by live processes; delete others; dry-run required; run as `paradox`;
+never touch `/opt/paradox` media/apps/configs.
 
 | ID | Requirement |
 |----|-------------|
-| P1 | UI action + optional systemd timer / low-disk trigger |
-| P2 | Default weekly **or** when disk ≥ warn |
+| P1 | UI action (session-gated) + in-process auto schedule |
+| P2 | When `schedule` is `weekly` or `low_disk`: prune at **startup** and every `interval_hours`; also when disk ≥ warn if `low_disk` |
 | P3–P5 | Dry-run, bytes reclaimed report, MQTT/log result |
 
-Detail: [pending/01-disk-and-ide-prune.md](pending/01-disk-and-ide-prune.md).
+`manual_only` disables auto prune (UI still available when logged in).
 
 ---
 
 ## 7. Service / process health
 
-PxH probes **systemd** (and optionally process heuristics) for units listed in config — per machine,
-so installs that omit PxB/PxT simply omit those units.
-
 | Tier | Examples | Behavior |
 |------|----------|----------|
-| **Required** | `mosquitto`, `nginx`, room Paradox units (`pfx`, `pxo`, …) | Failed/inactive → UI critical + optional MQTT alert |
+| **Required** | `mosquitto`, `nginx`, room Paradox units (`pfx`, `pxo`, …) | Failed/inactive → UI critical + MQTT alert |
 | **Optional** | `paradox-health` self, extras | Shown but soft |
-| **User-defined** | Operator-added unit names in `pxh.ini` | Same three-state model |
+| **User-defined** | Operator-added unit names in `pxh.ini` | Same state model |
 
-**States (MVP):** `running` | `stopped` | `failed` | `unknown`  
-(“Running with errors” = `failed` or active-but-degraded when detectable, e.g. systemd `failed`
-result / restart rate-limit — do not invent deep app health checks; that stays in each app / PxP.)
-
-Plan: [pending/03-service-health.md](pending/03-service-health.md).
+**States:** `running` | `stopped` | `failed` | `unknown`
 
 ---
 
 ## 8. How the UI is served (nginx vs self)
 
-**Decision (proposed):**
+**Decision (approved):**
 
 1. **Primary:** nginx proxies `/health-api/` → `127.0.0.1:19090` and aliases `/health/` → static UI
    (or proxies `/health/` → PxH `/ui/`).
-2. **Always-on fallback:** PxH binds API+UI on `:19090` (configurable). Operators bookmark
-   `http://<host>:19090/ui/` for when nginx itself is the patient.
-3. **Do not** dynamically “take over” port 80 if nginx dies — fighting for privileged ports as
-   `paradox` is fragile and unsafe. Detection of “nginx down /health broken” → highlight in UI
-   (when reached via :19090) and MQTT alert; optional Tailscale-only LAN bind.
-
-Plan: [pending/04-serve-path-and-fallback.md](pending/04-serve-path-and-fallback.md).
+2. **Always-on fallback:** PxH binds API+UI on `:19090` (default `0.0.0.0`).
+3. **Do not** auto-bind :80/:443 when nginx fails. When UI is loaded via `:19090`, probe nginx
+   `/health/` and show a degraded banner if unreachable.
 
 ---
 
@@ -175,59 +173,47 @@ Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, service summary st
 
 ### 9.2 System Warnings (MQTT)
 
-Config-driven list of topic **patterns** (MQTT shared subscription / client wildcards). Each rule
-has a **color key** (app family). Messages append to a ring buffer shown in a text panel.
-
-**Default history:** last **200** lines **or** **24 hours**, whichever limit hits first
-(`warnings.history_lines=200`, `warnings.history_hours=24`) — operator-overridable in `pxh.ini`.
-
-Sample color keys (day/night CSS pairs — see §9.5): PFx/PFxE, PxO, Pio, PxB, PxT, game
-(`paradox/<room>/+/warnings`), default.
+Config-driven topic patterns + color keys; ring buffer (default 200 lines / 24h).
 
 ### 9.3 Journal Messages
 
-**Separate panel — yes (proposed).** Source: `journalctl` for configured units (or `_SYSTEMD_UNIT`
-match list). Color by **severity** (emerg/alert/crit/err / warning / notice/info/debug) with fixed
-CSS — not per-app colors (severity is the useful axis for journals). Same history knobs default
-**100 lines / 6 hours**.
+**Separate panel.** Source: `journalctl` for configured units. Color by **severity**. Default
+100 lines / 6 hours.
 
 ### 9.4 Prop appearances
 
-Optional panel subscribed to `paradox/props` (and extras). Shows one-shot announce/arrival payloads.
-History default **50** lines / **7 days** (props appear rarely).
+Optional panel on `paradox/props` (+ config). Default 50 lines / 7 days.
 
 ### 9.5 Themes
 
-`ui.theme = day | night | auto` (auto = `prefers-color-scheme`) **plus** a header toggle.
-- Day: light/white background  
-- Night: dark grey background  
-Semantic colors (e.g. “red”) map to **dark-red on day** / **light-red on night** for contrast.
+`ui.theme = day | night | auto` **plus** a header toggle persisted in `localStorage`.
+Semantic colors map to dark tones on day / light tones on night.
 
-Plan: [pending/05-ui-panels-and-themes.md](pending/05-ui-panels-and-themes.md).
+### 9.6 Live data
+
+**WebSocket primary** (`WS /ws`); HTTP GET panels for bootstrap and poll fallback.
 
 ---
 
 ## 10. MQTT publication (PxH → bus)
+
+With `topic_root=paradox` (default) and machine `id`:
 
 | Topic | Retained | Content |
 |-------|----------|---------|
 | `paradox/<id>/system/health` | yes | Metrics snapshot |
 | `paradox/<id>/system/disk` | yes | diskRoot + level |
 | `paradox/<id>/system/services` | yes | Unit states summary |
-| `paradox/<id>/system/alerts` | no* | Threshold / service alerts |
+| `paradox/<id>/system/alerts` | **no** | Threshold / service alerts (critical reaffirm while active) |
 
-\* Last critical alert may be retained — open. Do **not** overload suite app `/warnings` topics;
-PxH system alerts stay under `…/system/alerts`.
+Do **not** overload suite app `/warnings` topics; PxH system alerts stay under `…/system/alerts`.
+Broker is often local but must be configurable.
 
 ---
 
 ## 11. PxD landing integration
 
-PxD landing / `room.json` should include an optional **System Health** link (path `/health/` or
-absolute `:19090/ui/`). Document in starter `room.json` as a commented or clearly optional entry
-operators can disable if PxH is absent.
-
-Plan: [pending/07-pxd-landing-link.md](pending/07-pxd-landing-link.md).
+PxD starter `room.json` includes an optional **System Health** link (`/health/` or `:19090/ui/`).
 
 ---
 
@@ -236,11 +222,9 @@ Plan: [pending/07-pxd-landing-link.md](pending/07-pxd-landing-link.md).
 | Surface | Owner | Notes |
 |---------|-------|-------|
 | Host `/health/` beacon | **PxH** | This product |
-| Fleet Machine Health / pairing / remote service control | **PxP + pxp-agent** | Overlap in “service start/stop” — keep PxH local/LAN; PxP for multi-machine + auth |
-| MQTT Explorer-style topic tree | **PxP MQTT Monitor** | Not PxH ([MQTT_MONITOR.md](../../PxP/docs/MQTT_MONITOR.md)) |
-| pi5-ssd Hub + old health | Lab one-off | Relocate off `/health/` and `:19090` / avoid `…/system/*` if colliding |
-
-Plans: [08-pxp-and-agent.md](pending/08-pxp-and-agent.md), [09-pi5-ssd-coexistence.md](pending/09-pi5-ssd-coexistence.md).
+| Fleet Machine Health / pairing / remote service control | **PxP + pxp-agent** | Both may start/stop services: PxH = local emergency; agent = managed remote |
+| MQTT Explorer-style topic tree | **PxP MQTT Monitor** | Not PxH |
+| pi5-ssd Hub + old health | Lab one-off | Relocate off `/health/` and `:19090` if colliding |
 
 ---
 
@@ -251,24 +235,22 @@ Plans: [08-pxp-and-agent.md](pending/08-pxp-and-agent.md), [09-pi5-ssd-coexisten
 3. Disk warn → MQTT `…/system/alerts` within one publish interval.  
 4. Configured required services show running/stopped/failed.  
 5. System Warnings panel shows live `/warnings` traffic from configured patterns.  
-6. IDE prune dry-run works; execute gated.  
+6. IDE prune dry-run works; execute gated by session.  
 7. PxD starter docs/example include System Health link.  
 8. Theme day/night/auto + toggle.
 
 ---
 
-## 14. Explicitly deferred (tracked outside MVP)
+## 14. Explicitly deferred
 
 Premium IM push, remote summary portal, game JSONL UX, snapshots, people-count audit, daily owner
-reports / “PxP-Audit” daemon — opinions and plans in [BUSINESS-OVERVIEW.html](BUSINESS-OVERVIEW.html)
-and [pending/INDEX.md](pending/INDEX.md).
+reports — see [BUSINESS-OVERVIEW.html](BUSINESS-OVERVIEW.html) and [pending/INDEX.md](pending/INDEX.md).
 
 ---
 
 ## 15. Related references
 
 - API: [API.md](API.md)  
+- Install: [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md)  
 - Example config: [../config/pxh.example.ini](../config/pxh.example.ini)  
-- Suite MQTT contract: `../../.github/copilot-instructions.md` (`…/warnings` plural)  
-- PxP-Agent: `../../PxP-Agent/docs/SPEC.md`  
-- PxO gameplay JSONL: `../../PxO/docs/SPEC.md` (Gameplay Analytics)
+- Sudoers: [../config/sudoers.paradox-health](../config/sudoers.paradox-health)

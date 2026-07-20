@@ -35,5 +35,7 @@ Update docs in the same change as behaviour. Commit prefixes: `Docs:`, `Implemen
 ## MVP priorities
 
 1. Non-null reliable `diskRoot` metrics (D1)
-2. Threshold MQTT alerts (M2, D2–D3)
-3. Deployable unit on Agent22-class hosts (S1–S4)
+2. Threshold MQTT alerts (D2–D3)
+3. systemd services + warnings/journal/props panels + themes (§13)
+4. PAM session for actions; IDE prune dry-run/execute + auto schedule
+5. Deployable unit + sudoers on Agent22-class hosts

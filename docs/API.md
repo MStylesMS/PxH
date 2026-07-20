@@ -1,11 +1,14 @@
 # Paradox Health Monitor — HTTP / MQTT API
 
-_Status: draft (docs iteration)_ · See [SPEC.md](SPEC.md)
+_Status: MVP_ · See [SPEC.md](SPEC.md)
 
-**Direct (always):** `http://<host>:19090` (default; configurable)  
+**Direct (always):** `http://<host>:19090` (default bind `0.0.0.0`)  
 **Via nginx (preferred):** `http://<host>/health-api/` → API; `http://<host>/health/` → UI  
 
 UI also at `http://<host>:19090/ui/` when `serve_ui=true` (fallback if nginx is down).
+
+**Auth:** Viewing (metrics, panels, WebSocket) is open on the trusted LAN/Tailscale network.
+Maintenance `/actions/*` and prune preview require a PAM session (local OS user).
 
 ---
 
@@ -14,9 +17,9 @@ UI also at `http://<host>:19090/ui/` when `serve_ui=true` (fallback if nginx is 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/` or `/health` | `{ status, version, name }` |
-| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel` |
-| `GET` | `/services` | Configured systemd units with `state`: `running`\|`stopped`\|`failed`\|`unknown` |
-| `GET` | `/runtime` | Alias or superset of `/services` for prototype compatibility |
+| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel`, optional `topConsumers` |
+| `GET` | `/services` | Configured systemd units with `state`, `tier` |
+| `GET` | `/runtime` | Alias of `/services` (prototype compatibility) |
 
 ### `diskRoot` (required when `/` readable)
 
@@ -28,16 +31,42 @@ UI also at `http://<host>:19090/ui/` when `serve_ui=true` (fallback if nginx is 
 
 ---
 
-## 2. UI data feeds (ring buffers)
+## 2. Auth (PAM session)
+
+| Method | Path | Body | Description |
+|--------|------|------|-------------|
+| `POST` | `/auth/login` | `{ "username", "password" }` | PAM local login → httpOnly session cookie |
+| `POST` | `/auth/logout` | — | Clear session |
+| `GET` | `/auth/session` | — | `{ authenticated, username? }` |
+
+Session lifetime: `[actions] session_hours` (default 12). Optional `[actions] allowed_users` allowlist.
+
+---
+
+## 3. UI data feeds (ring buffers)
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/panels/warnings` | Recent MQTT warning lines (`lines`, `since` query) |
 | `GET` | `/panels/journal` | Recent journal lines for configured units |
-| `GET` | `/panels/props` | Recent `paradox/props` (etc.) announce messages |
-| `GET` | `/panels/meta` | Active theme recommendation, history limits, color map |
+| `GET` | `/panels/props` | Recent prop announce messages |
+| `GET` | `/panels/meta` | Theme default, history limits, color map |
 
-WebSocket (optional MVP+): `WS /ws` subscribe to `warnings` | `journal` | `props` | `metrics`.
+**WebSocket (primary live feed):** `WS /ws`
+
+Client → server:
+
+```json
+{ "op": "subscribe", "channels": ["metrics", "warnings", "journal", "props", "services"] }
+```
+
+Server → client:
+
+```json
+{ "channel": "metrics", "data": { } }
+```
+
+HTTP GET panels remain for bootstrap and poll fallback (`ui.refresh_seconds`).
 
 Each warning line shape:
 
@@ -52,9 +81,9 @@ Each warning line shape:
 
 ---
 
-## 3. Actions
+## 4. Actions
 
-Gated by `[actions]` in config; destructive bodies need `"confirm": true`.
+Require valid session cookie. Gated by `[actions]` flags; destructive bodies need `"confirm": true`.
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
@@ -63,33 +92,37 @@ Gated by `[actions]` in config; destructive bodies need `"confirm": true`.
 | `POST` | `/actions/service` | `{ "name", "action" }` | start/stop/restart allowlisted unit |
 | `POST` | `/actions/cleanup` | `{ "targets", "confirm", "dryRun?" }` | apt/npm/ide clean |
 | `POST` | `/actions/prune-ide` | `{ "confirm", "dryRun?" }` | IDE server prune (SPEC §6) |
-| `GET` | `/actions/prune-ide/preview` | — | Dry-run inventory without POST |
+| `GET` | `/actions/prune-ide/preview` | — | Dry-run inventory (session required) |
+
+Unauthenticated → **401**.
 
 ---
 
-## 4. MQTT — publish (PxH → broker)
+## 5. MQTT — publish (PxH → broker)
+
+With `topic_root=paradox` and `[machine] id=<id>`:
 
 | Topic | Retained | Payload |
 |-------|----------|---------|
 | `paradox/<id>/system/health` | yes | metrics snapshot |
 | `paradox/<id>/system/disk` | yes | diskRoot + level |
 | `paradox/<id>/system/services` | yes | services array |
-| `paradox/<id>/system/alerts` | usually no | `{ level, type, message, …, ts }` |
+| `paradox/<id>/system/alerts` | no | `{ level, type, message, …, ts }` |
 
-`<id>` from `[machine] id`. Soft-fail if broker down.
+Alerts are non-retained; critical is reaffirmed periodically while still critical.
+Soft-fail if broker down. Optional `topic_base` overrides the `{topic_root}/{id}` prefix.
 
 ---
 
-## 5. MQTT — subscribe (broker → PxH panels)
+## 6. MQTT — subscribe (broker → PxH panels)
 
-Configured in `[warnings]`, `[props]` (and optionally game wildcards). Canonical suite suffix is
-**`/warnings` (plural)** — see suite MQTT contract.
+Configured in `[warnings]`, `[props]`. Canonical suite suffix is **`/warnings` (plural)**.
 
 Default patterns (example ini):
 
 - `paradox/+/pfx/warnings`, `paradox/+/pfxe/warnings` → color `pfx`
 - `paradox/+/pxo/warnings` → `pxo`
-- `paradox/+/pio/warnings` or configured pio topic → `pio`
+- `paradox/+/pio/warnings` → `pio`
 - `paradox/+/pxb/warnings`, `paradox/+/pxb/+/warnings` → `pxb`
 - `paradox/+/pxt/warnings` → `pxt`
 - `paradox/+/+/warnings` (game / catch-all) → `game` (lower priority than specific rules)
@@ -97,7 +130,7 @@ Default patterns (example ini):
 
 ---
 
-## 6. History defaults
+## 7. History defaults
 
 | Panel | Default lines | Default hours | Config keys |
 |-------|---------------|---------------|-------------|
@@ -109,12 +142,13 @@ Evict by whichever limit is hit first.
 
 ---
 
-## 7. Errors
+## 8. Errors
 
 | Code | Cause |
 |------|--------|
 | 400 | Missing confirm / bad body |
-| 403 | Action disabled or unit not allowlisted |
+| 401 | Action requires login |
+| 403 | Action disabled, user not allowlisted, or unit not allowlisted |
 | 404 | Unknown service |
 | 500 | Collection/action failure |
 | 503 | Optional dependency (e.g. journalctl unavailable) |

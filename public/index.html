@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>System Health — Paradox Health Monitor</title>
   <style>
-    :root {
+    :root, [data-theme="night"] {
       --bg: #0f1419;
       --panel: #1a222c;
       --text: #e8eef4;
@@ -14,12 +14,28 @@
       --warn: #c4922a;
       --crit: #c44a4a;
       --accent: #5b8def;
+      --border: #243140;
+      --c-red: #f07178; --c-orange: #e6a35c; --c-purple: #c792ea;
+      --c-teal: #7fdbca; --c-blue: #82aaff; --c-amber: #ffcb6b; --c-gray: #a0a8b4;
+    }
+    [data-theme="day"] {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --text: #1a222c;
+      --muted: #5a6a7a;
+      --ok: #1a7a4a;
+      --warn: #9a6a10;
+      --crit: #a03030;
+      --accent: #2a5fbf;
+      --border: #d0d8e0;
+      --c-red: #a02030; --c-orange: #a06010; --c-purple: #6a3080;
+      --c-teal: #106060; --c-blue: #2040a0; --c-amber: #8a6010; --c-gray: #505860;
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Segoe UI", system-ui, sans-serif;
-      background: radial-gradient(1200px 600px at 10% -10%, #1a2a3a, var(--bg));
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
     }
@@ -31,39 +47,118 @@
       align-items: baseline;
       justify-content: space-between;
     }
-    h1 { margin: 0; font-size: 1.35rem; font-weight: 650; letter-spacing: 0.02em; }
+    h1 { margin: 0; font-size: 1.35rem; font-weight: 650; }
+    h2 { margin: 0 0 0.5rem; font-size: 0.95rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
     .brand { color: var(--muted); font-size: 0.85rem; }
-    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
-    button {
+    .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    button, .btn {
       background: var(--panel);
       color: var(--text);
-      border: 1px solid #2c3a4a;
+      border: 1px solid var(--border);
       border-radius: 6px;
       padding: 0.45rem 0.85rem;
       cursor: pointer;
+      font-size: 0.85rem;
     }
     button:hover { border-color: var(--accent); }
-    button.danger { border-color: #6a3030; }
-    main {
+    button.danger { border-color: var(--crit); }
+    button.primary { border-color: var(--accent); }
+    #banner {
+      display: none;
+      margin: 0 1.5rem;
+      padding: 0.6rem 0.9rem;
+      background: var(--panel);
+      border: 1px solid var(--warn);
+      border-radius: 6px;
+      color: var(--warn);
+      font-size: 0.85rem;
+    }
+    #banner.show { display: block; }
+    main.cards {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 0.75rem;
-      padding: 1rem 1.5rem 2rem;
+      padding: 1rem 1.5rem 0.5rem;
     }
     .card {
       background: var(--panel);
       border-radius: 10px;
       padding: 0.9rem 1rem;
-      border: 1px solid #243140;
+      border: 1px solid var(--border);
     }
-    .card .label { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
-    .card .value { font-size: 1.45rem; font-weight: 600; margin-top: 0.35rem; }
-    .card .sub { color: var(--muted); font-size: 0.8rem; margin-top: 0.25rem; }
+    .card .label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .card .value { font-size: 1.35rem; font-weight: 600; margin-top: 0.3rem; }
+    .card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; }
     .ok .value { color: var(--ok); }
     .warn .value { color: var(--warn); }
     .critical .value { color: var(--crit); }
+    #services {
+      padding: 0.5rem 1.5rem 1rem;
+      display: flex; flex-wrap: wrap; gap: 0.4rem;
+    }
+    .svc {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.55rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--panel);
+    }
+    .svc.running { border-color: var(--ok); color: var(--ok); }
+    .svc.failed, .svc.stopped.required { border-color: var(--crit); color: var(--crit); }
+    .svc.stopped { color: var(--muted); }
+    .panels {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.75rem;
+      padding: 0 1.5rem 1.5rem;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-log {
+      flex: 1;
+      overflow: auto;
+      max-height: 240px;
+      font-family: ui-monospace, monospace;
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+    .panel-log .line { margin: 0.15rem 0; white-space: pre-wrap; word-break: break-word; }
+    .c-red { color: var(--c-red); } .c-orange { color: var(--c-orange); }
+    .c-purple { color: var(--c-purple); } .c-teal { color: var(--c-teal); }
+    .c-blue { color: var(--c-blue); } .c-amber { color: var(--c-amber); }
+    .c-gray { color: var(--c-gray); }
+    .sev-err { color: var(--crit); } .sev-warning { color: var(--warn); }
+    .sev-info, .sev-notice, .sev-debug { color: var(--muted); }
     footer { padding: 0 1.5rem 1.5rem; color: var(--muted); font-size: 0.8rem; }
     #status { min-height: 1.2em; }
+    .user-pill { font-size: 0.8rem; color: var(--muted); }
+    dialog {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--text);
+      padding: 1.25rem;
+      max-width: 360px;
+    }
+    dialog::backdrop { background: rgba(0,0,0,0.45); }
+    dialog label { display: block; font-size: 0.8rem; color: var(--muted); margin: 0.5rem 0 0.2rem; }
+    dialog input {
+      width: 100%;
+      padding: 0.45rem 0.6rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+    }
+    dialog .row { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem; }
+    #auth-err { color: var(--crit); font-size: 0.8rem; min-height: 1.1em; }
   </style>
 </head>
 <body>
@@ -73,25 +168,93 @@
       <div class="brand">Paradox Health Monitor (PxH)</div>
     </div>
     <div class="actions">
+      <span class="user-pill" id="user-pill">Not logged in</span>
+      <button type="button" id="btn-theme">Theme</button>
+      <button type="button" id="btn-login" class="primary">Login</button>
+      <button type="button" id="btn-logout" style="display:none">Logout</button>
       <button type="button" id="btn-refresh">Refresh</button>
-      <button type="button" id="btn-upgrade">Upgrade Packages</button>
-      <button type="button" class="danger" id="btn-reboot">Restart Machine</button>
+      <button type="button" id="btn-cleanup">Cleanup</button>
+      <button type="button" id="btn-prune">IDE Prune</button>
+      <button type="button" id="btn-upgrade">Upgrade</button>
+      <button type="button" class="danger" id="btn-reboot">Reboot</button>
     </div>
   </header>
-  <main id="cards"></main>
+  <div id="banner"></div>
+  <main class="cards" id="cards"></main>
+  <div id="services"></div>
+  <section class="panels">
+    <div class="panel">
+      <h2>System Warnings</h2>
+      <div class="panel-log" id="log-warnings"></div>
+    </div>
+    <div class="panel">
+      <h2>Journal</h2>
+      <div class="panel-log" id="log-journal"></div>
+    </div>
+    <div class="panel">
+      <h2>Prop Appearances</h2>
+      <div class="panel-log" id="log-props"></div>
+    </div>
+  </section>
   <footer>
     <div id="status">Loading…</div>
-    <div>Auto-refresh every 15s · API <code id="api-base">/metrics</code></div>
+    <div>WS live · poll fallback · API <code id="api-base"></code></div>
   </footer>
+
+  <dialog id="login-dialog">
+    <form method="dialog" id="login-form">
+      <h2 style="text-transform:none;color:var(--text)">Local login</h2>
+      <p style="font-size:0.85rem;color:var(--muted);margin:0.25rem 0 0.5rem">
+        Use a username and password from this machine.
+      </p>
+      <label for="login-user">Username</label>
+      <input id="login-user" name="username" autocomplete="username" required />
+      <label for="login-pass">Password</label>
+      <input id="login-pass" name="password" type="password" autocomplete="current-password" required />
+      <div id="auth-err"></div>
+      <div class="row">
+        <button type="button" id="login-cancel">Cancel</button>
+        <button type="submit" class="primary">Sign in</button>
+      </div>
+    </form>
+  </dialog>
+
   <script>
     const API = (function resolveApi() {
-      // Prefer same-origin /health-api when behind nginx; else relative to this server (/ui → parent)
       if (location.pathname.startsWith('/health')) return '/health-api';
       return '';
     })();
+    document.getElementById('api-base').textContent = API || '(direct)';
 
-    const cardsEl = document.getElementById('cards');
-    const statusEl = document.getElementById('status');
+    const THEME_KEY = 'pxh-theme';
+    let meta = { theme: 'auto', refreshSeconds: 15, warningColors: {} };
+    let authenticated = false;
+    let username = null;
+    let pendingAction = null;
+    let ws = null;
+    let pollTimer = null;
+
+    const colorMap = {
+      red: 'c-red', orange: 'c-orange', purple: 'c-purple',
+      teal: 'c-teal', blue: 'c-blue', amber: 'c-amber', gray: 'c-gray',
+    };
+
+    function applyTheme(mode) {
+      let effective = mode;
+      if (mode === 'auto') {
+        effective = matchMedia('(prefers-color-scheme: light)').matches ? 'day' : 'night';
+      }
+      document.documentElement.setAttribute('data-theme', effective);
+      document.getElementById('btn-theme').textContent =
+        mode === 'auto' ? 'Theme: auto' : `Theme: ${mode}`;
+    }
+
+    function cycleTheme() {
+      const cur = localStorage.getItem(THEME_KEY) || meta.theme || 'auto';
+      const next = cur === 'auto' ? 'day' : cur === 'day' ? 'night' : 'auto';
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme(next);
+    }
 
     function levelClass(level) {
       if (level === 'critical') return 'critical';
@@ -106,35 +269,6 @@
         `</article>`;
     }
 
-    async function loadMetrics() {
-      try {
-        const res = await fetch(`${API}/metrics`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const m = await res.json();
-        const disk = m.diskRoot;
-        const diskCls = levelClass(m.diskLevel);
-        const diskVal = disk ? `${disk.usedPercent}%` : 'n/a';
-        const diskSub = disk
-          ? `${disk.usedGb} / ${disk.totalGb} GB · ${disk.availableGb} GB free`
-          : 'disk metrics unavailable';
-
-        cardsEl.innerHTML = [
-          card('Host', m.hostname || '—', m.timestamp),
-          card('Uptime', formatUptime(m.uptimeSeconds)),
-          card('CPU', `${m.cpuPercent}%`, `load ${m.load?.one} / ${m.load?.five} / ${m.load?.fifteen}`),
-          card('Temp', m.cpuTempC != null ? `${m.cpuTempC}°C` : 'n/a'),
-          card('GPU mem', m.gpuMemMb != null ? `${m.gpuMemMb} MB` : 'n/a'),
-          card('RAM', `${m.ram?.usedPercent}%`, `${m.ram?.usedMb} / ${m.ram?.totalMb} MB`),
-          card('Disk', diskVal, diskSub, diskCls),
-          card('Updates', m.aptUpdatesAvailable != null ? String(m.aptUpdatesAvailable) : 'n/a'),
-        ].join('');
-
-        statusEl.textContent = `Updated ${m.timestamp} · disk ${m.diskLevel}`;
-      } catch (err) {
-        statusEl.textContent = `Failed to load metrics: ${err.message}`;
-      }
-    }
-
     function formatUptime(sec) {
       if (sec == null) return '—';
       const d = Math.floor(sec / 86400);
@@ -143,29 +277,261 @@
       return d > 0 ? `${d}d ${h}h` : `${h}h ${m}m`;
     }
 
-    async function post(path, body) {
+    function renderMetrics(m) {
+      const disk = m.diskRoot;
+      const diskCls = levelClass(m.diskLevel);
+      const diskVal = disk ? `${disk.usedPercent}%` : 'n/a';
+      const diskSub = disk
+        ? `${disk.usedGb} / ${disk.totalGb} GB · ${disk.availableGb} GB free`
+        : 'disk metrics unavailable';
+      document.getElementById('cards').innerHTML = [
+        card('Host', m.hostname || '—', m.timestamp),
+        card('Uptime', formatUptime(m.uptimeSeconds)),
+        card('CPU', `${m.cpuPercent}%`, `load ${m.load?.one} / ${m.load?.five} / ${m.load?.fifteen}`),
+        card('Temp', m.cpuTempC != null ? `${m.cpuTempC}°C` : 'n/a'),
+        card('GPU mem', m.gpuMemMb != null ? `${m.gpuMemMb} MB` : 'n/a'),
+        card('RAM', `${m.ram?.usedPercent}%`, `${m.ram?.usedMb} / ${m.ram?.totalMb} MB`),
+        card('Disk', diskVal, diskSub, diskCls),
+        card('Updates', m.aptUpdatesAvailable != null ? String(m.aptUpdatesAvailable) : 'n/a'),
+        card('sudo', m.sudoNopasswd === true ? 'OK' : m.sudoNopasswd === false ? 'missing' : '?', 'NOPASSWD'),
+      ].join('');
+      document.getElementById('status').textContent =
+        `Updated ${m.timestamp} · disk ${m.diskLevel}` +
+        (m.topConsumers?.length
+          ? ` · top: ${m.topConsumers.slice(0, 3).map((c) => `${c.label} ${c.sizeMb}MB`).join(', ')}`
+          : '');
+    }
+
+    function renderServices(data) {
+      const list = data.services || data || [];
+      document.getElementById('services').innerHTML = list.map((s) => {
+        const cls = [s.state, s.tier === 'required' ? 'required' : ''].filter(Boolean).join(' ');
+        return `<span class="svc ${cls}" title="${s.tier}">${s.name}: ${s.state}</span>`;
+      }).join('');
+    }
+
+    function appendLines(elId, lines, mode) {
+      const el = document.getElementById(elId);
+      if (!lines || !lines.length) return;
+      const html = lines.map((l) => {
+        let cls = 'c-gray';
+        if (mode === 'warnings') {
+          const sem = meta.warningColors?.[l.colorKey] || l.colorKey || 'gray';
+          cls = colorMap[sem] || 'c-gray';
+        } else if (mode === 'journal') {
+          cls = `sev-${l.severity || 'info'}`;
+        }
+        const prefix = l.topic ? `[${l.topic}] ` : '';
+        return `<div class="line ${cls}">${l.ts?.slice(11, 19) || ''} ${prefix}${escapeHtml(l.text)}</div>`;
+      }).join('');
+      el.innerHTML = html;
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    async function fetchJson(path, opts) {
       const res = await fetch(`${API}${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body || {}),
+        credentials: 'same-origin',
+        ...opts,
+        headers: {
+          ...(opts?.body ? { 'Content-Type': 'application/json' } : {}),
+          ...opts?.headers,
+        },
       });
       const data = await res.json().catch(() => ({}));
-      statusEl.textContent = data.message || (res.ok ? 'OK' : `Error ${res.status}`);
+      return { res, data };
+    }
+
+    async function refreshSession() {
+      const { data } = await fetchJson('/auth/session');
+      authenticated = !!data.authenticated;
+      username = data.username || null;
+      document.getElementById('user-pill').textContent = authenticated
+        ? `Signed in as ${username}`
+        : 'Not logged in';
+      document.getElementById('btn-login').style.display = authenticated ? 'none' : '';
+      document.getElementById('btn-logout').style.display = authenticated ? '' : 'none';
+    }
+
+    async function ensureAuth() {
+      await refreshSession();
+      if (authenticated) return true;
+      return new Promise((resolve) => {
+        pendingAction = resolve;
+        document.getElementById('auth-err').textContent = '';
+        document.getElementById('login-dialog').showModal();
+      });
+    }
+
+    async function postAction(path, body) {
+      if (!(await ensureAuth())) return;
+      const { res, data } = await fetchJson(path, {
+        method: 'POST',
+        body: JSON.stringify(body || {}),
+      });
+      if (res.status === 401) {
+        authenticated = false;
+        if (await ensureAuth()) return postAction(path, body);
+        return;
+      }
+      document.getElementById('status').textContent = data.message || (res.ok ? 'OK' : `Error ${res.status}`);
       return data;
     }
 
-    document.getElementById('btn-refresh').onclick = () => loadMetrics();
-    document.getElementById('btn-upgrade').onclick = () => {
-      if (confirm('Run apt update/upgrade on this machine?')) post('/actions/upgrade');
+    function connectWs() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const base = API || '';
+      const url = `${proto}//${location.host}${base}/ws`;
+      try {
+        ws = new WebSocket(url);
+      } catch (e) {
+        startPoll();
+        return;
+      }
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          op: 'subscribe',
+          channels: ['metrics', 'services', 'warnings', 'journal', 'props'],
+        }));
+        document.getElementById('status').textContent = 'WebSocket connected';
+      };
+      ws.onmessage = (ev) => {
+        try {
+          const msg = JSON.parse(ev.data);
+          if (msg.channel === 'metrics') renderMetrics(msg.data);
+          if (msg.channel === 'services') renderServices(msg.data);
+          if (msg.channel === 'warnings') {
+            const lines = msg.data.lines || (msg.data.ts ? [msg.data] : []);
+            if (msg.data.lines) appendLines('log-warnings', lines, 'warnings');
+            else if (msg.data.ts) {
+              const el = document.getElementById('log-warnings');
+              const sem = meta.warningColors?.[msg.data.colorKey] || 'gray';
+              el.insertAdjacentHTML('beforeend',
+                `<div class="line ${colorMap[sem] || 'c-gray'}">${msg.data.ts.slice(11, 19)} [${msg.data.topic}] ${escapeHtml(msg.data.text)}</div>`);
+              el.scrollTop = el.scrollHeight;
+            }
+          }
+          if (msg.channel === 'journal' && msg.data.lines) appendLines('log-journal', msg.data.lines, 'journal');
+          if (msg.channel === 'props') {
+            if (msg.data.lines) appendLines('log-props', msg.data.lines, 'props');
+            else if (msg.data.ts) {
+              const el = document.getElementById('log-props');
+              el.insertAdjacentHTML('beforeend',
+                `<div class="line c-gray">${msg.data.ts.slice(11, 19)} ${escapeHtml(msg.data.text)}</div>`);
+            }
+          }
+        } catch { /* */ }
+      };
+      ws.onclose = () => {
+        document.getElementById('status').textContent = 'WebSocket closed — polling';
+        startPoll();
+        setTimeout(connectWs, 5000);
+      };
+      ws.onerror = () => { /* onclose handles */ };
+    }
+
+    async function pollOnce() {
+      const [m, s, w, j, p] = await Promise.all([
+        fetchJson('/metrics?topConsumers=1'),
+        fetchJson('/services'),
+        fetchJson('/panels/warnings'),
+        fetchJson('/panels/journal'),
+        fetchJson('/panels/props'),
+      ]);
+      if (m.res.ok) renderMetrics(m.data);
+      if (s.res.ok) renderServices(s.data);
+      if (w.res.ok) appendLines('log-warnings', w.data.lines, 'warnings');
+      if (j.res.ok) appendLines('log-journal', j.data.lines, 'journal');
+      if (p.res.ok) appendLines('log-props', p.data.lines, 'props');
+    }
+
+    function startPoll() {
+      if (pollTimer) return;
+      void pollOnce();
+      pollTimer = setInterval(pollOnce, (meta.refreshSeconds || 15) * 1000);
+    }
+
+    async function checkNginxBanner() {
+      if (location.port === '19090' || location.port === '') {
+        try {
+          const r = await fetch('/health/', { method: 'HEAD', cache: 'no-store' });
+          if (!r.ok) throw new Error('bad');
+        } catch {
+          if (location.port === '19090') {
+            const b = document.getElementById('banner');
+            b.textContent = 'nginx /health/ unreachable — using :19090 fallback';
+            b.classList.add('show');
+          }
+        }
+      }
+    }
+
+    document.getElementById('btn-theme').onclick = cycleTheme;
+    document.getElementById('btn-refresh').onclick = () => pollOnce();
+    document.getElementById('btn-login').onclick = () => ensureAuth();
+    document.getElementById('btn-logout').onclick = async () => {
+      await fetchJson('/auth/logout', { method: 'POST' });
+      await refreshSession();
     };
-    document.getElementById('btn-reboot').onclick = () => {
+    document.getElementById('login-cancel').onclick = () => {
+      document.getElementById('login-dialog').close();
+      if (pendingAction) { pendingAction(false); pendingAction = null; }
+    };
+    document.getElementById('login-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const u = document.getElementById('login-user').value;
+      const p = document.getElementById('login-pass').value;
+      const { res, data } = await fetchJson('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: u, password: p }),
+      });
+      if (!res.ok) {
+        document.getElementById('auth-err').textContent = data.message || 'Login failed';
+        return;
+      }
+      document.getElementById('login-dialog').close();
+      document.getElementById('login-pass').value = '';
+      await refreshSession();
+      if (pendingAction) { pendingAction(true); pendingAction = null; }
+    };
+
+    document.getElementById('btn-upgrade').onclick = async () => {
+      if (confirm('Run apt update/upgrade on this machine?')) postAction('/actions/upgrade');
+    };
+    document.getElementById('btn-reboot').onclick = async () => {
       if (confirm('Reboot this machine in about one minute?')) {
-        post('/actions/restart', { confirm: true });
+        postAction('/actions/restart', { confirm: true });
+      }
+    };
+    document.getElementById('btn-cleanup').onclick = async () => {
+      if (confirm('Clean apt + npm caches?')) {
+        postAction('/actions/cleanup', { targets: ['apt', 'npm'], confirm: true });
+      }
+    };
+    document.getElementById('btn-prune').onclick = async () => {
+      if (!(await ensureAuth())) return;
+      const { data: preview } = await fetchJson('/actions/prune-ide/preview');
+      const msg = preview.message || 'Dry-run done';
+      if (confirm(`${msg}\n\nExecute prune now?`)) {
+        postAction('/actions/prune-ide', { confirm: true, dryRun: false });
       }
     };
 
-    loadMetrics();
-    setInterval(loadMetrics, 15_000);
+    (async function init() {
+      const { data } = await fetchJson('/panels/meta');
+      meta = { ...meta, ...data };
+      const saved = localStorage.getItem(THEME_KEY) || meta.theme || 'auto';
+      applyTheme(saved);
+      await refreshSession();
+      await checkNginxBanner();
+      connectWs();
+      // bootstrap panels via HTTP once
+      await pollOnce();
+    })();
   </script>
 </body>
 </html>

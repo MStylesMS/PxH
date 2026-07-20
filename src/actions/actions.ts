@@ -1,11 +1,12 @@
 /**
- * Gated operator actions. Dangerous ops require confirm: true.
- * IDE prune / cleanup are stubbed with dry-run-friendly shapes for review.
+ * Gated operator actions. Destructive ops require confirm: true + session.
  */
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { PxhConfig } from '../types.js';
+import { allowlistedServiceNames } from '../runtime/services.js';
+import { runIdePrune, type PruneResult } from './pruneIde.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -25,7 +26,10 @@ export async function runUpgrade(cfg: PxhConfig): Promise<{ ok: boolean; message
   }
 }
 
-export async function runReboot(cfg: PxhConfig, confirm: boolean): Promise<{ ok: boolean; message: string }> {
+export async function runReboot(
+  cfg: PxhConfig,
+  confirm: boolean,
+): Promise<{ ok: boolean; message: string }> {
   if (!cfg.actions.enabled || !cfg.actions.allowReboot) {
     return { ok: false, message: 'Reboot action disabled in pxh.ini' };
   }
@@ -34,7 +38,6 @@ export async function runReboot(cfg: PxhConfig, confirm: boolean): Promise<{ ok:
     return { ok: false, message: 'Reboot is only supported on Linux' };
   }
   try {
-    // Delay so HTTP response can return
     void execFileAsync('sudo', ['shutdown', '-r', '+1', 'PxH requested reboot']);
     return { ok: true, message: 'Reboot scheduled in ~1 minute' };
   } catch (e) {
@@ -50,7 +53,7 @@ export async function runServiceAction(
   if (!cfg.actions.enabled || !cfg.actions.allowService) {
     return { ok: false, message: 'Service action disabled in pxh.ini' };
   }
-  if (!cfg.runtime.services.includes(name)) {
+  if (!allowlistedServiceNames(cfg).includes(name)) {
     return { ok: false, message: `Service ${name} is not allowlisted in pxh.ini` };
   }
   if (process.platform !== 'linux') {
@@ -86,12 +89,20 @@ export async function runCleanup(
     return { ok: true, message: 'Dry run — no changes', dryRun: true, planned };
   }
 
-  // MVP scaffold: execute apt clean only; npm/ide via dedicated endpoints
   try {
     if (targets.includes('apt') && process.platform === 'linux') {
       await execFileAsync('sudo', ['apt-get', 'clean']);
     }
-    return { ok: true, message: 'Cleanup completed (partial — see planned list)', dryRun: false, planned };
+    if (targets.includes('npm')) {
+      await execFileAsync('npm', ['cache', 'clean', '--force'], { timeout: 120_000 });
+    }
+    if (targets.includes('ide')) {
+      const prune = await runIdePrune(false);
+      if (!prune.ok) {
+        return { ok: false, message: prune.message, dryRun: false, planned };
+      }
+    }
+    return { ok: true, message: 'Cleanup completed', dryRun: false, planned };
   } catch (e) {
     return {
       ok: false,
@@ -102,21 +113,11 @@ export async function runCleanup(
   }
 }
 
-/**
- * IDE prune — scaffold returns dry-run inventory only until rules in SPEC §7.2 are fully wired.
- */
-export async function runPruneIde(
+export async function runPruneIdeAction(
   cfg: PxhConfig,
   confirm: boolean,
   dryRun: boolean,
-): Promise<{
-  ok: boolean;
-  message: string;
-  dryRun: boolean;
-  kept: string[];
-  deleted: string[];
-  bytesReclaimed: number;
-}> {
+): Promise<PruneResult> {
   if (!cfg.actions.enabled || !cfg.actions.allowPruneIde) {
     return {
       ok: false,
@@ -137,17 +138,5 @@ export async function runPruneIde(
       bytesReclaimed: 0,
     };
   }
-
-  // Scaffold: do not delete yet — report that implementation follows SPEC §7.2
-  return {
-    ok: true,
-    message:
-      dryRun || !confirm
-        ? 'Dry-run scaffold: scan/delete not yet implemented — see docs/SPEC.md §7.2'
-        : 'Prune execute path not yet implemented — refusing to delete (safe scaffold)',
-    dryRun: true,
-    kept: [],
-    deleted: [],
-    bytesReclaimed: 0,
-  };
+  return runIdePrune(dryRun || !confirm);
 }

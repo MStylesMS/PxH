@@ -8,8 +8,11 @@
 import { Command } from 'commander';
 import { loadConfig, resolveConfigPath } from './config/loadConfig.js';
 import { createServer } from './server/server.js';
-import { HealthPublisher } from './mqtt/publisher.js';
+import { MqttHub } from './mqtt/hub.js';
 import { collectMetrics } from './metrics/collector.js';
+import { getRuntimeServices } from './runtime/services.js';
+import { RingBuffer } from './panels/ringBuffer.js';
+import { PruneScheduler } from './runtime/pruneScheduler.js';
 import { APP_VERSION } from './types.js';
 
 const program = new Command();
@@ -26,8 +29,23 @@ const configPath = resolveConfigPath(opts.config);
 const config = loadConfig(configPath);
 if (opts.port) config.server.port = parseInt(opts.port, 10);
 
-const server = await createServer(config);
-const publisher = new HealthPublisher(config, () => collectMetrics(config));
+const warningsBuf = new RingBuffer(
+  config.warnings.historyLines,
+  config.warnings.historyHours,
+);
+const journalBuf = new RingBuffer(config.journal.historyLines, config.journal.historyHours);
+const propsBuf = new RingBuffer(config.props.historyLines, config.props.historyHours);
+
+const mqtt = new MqttHub(
+  config,
+  () => collectMetrics(config),
+  () => getRuntimeServices(config),
+  warningsBuf,
+  propsBuf,
+);
+
+const server = await createServer(config, { warningsBuf, journalBuf, propsBuf, mqtt });
+const pruneScheduler = new PruneScheduler(config, mqtt);
 
 try {
   await server.listen({ host: config.server.host, port: config.server.port });
@@ -37,7 +55,8 @@ try {
   if (config.server.serveUi) {
     console.log(`[pxh] System Health UI: http://${config.server.host}:${config.server.port}/ui/`);
   }
-  publisher.start();
+  mqtt.start();
+  pruneScheduler.start();
 } catch (err) {
   console.error('[pxh] Failed to start:', err);
   process.exit(1);
@@ -45,7 +64,8 @@ try {
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`[pxh] Shutdown (${signal})…`);
-  await publisher.stop();
+  pruneScheduler.stop();
+  await mqtt.stop();
   await server.close();
   process.exit(0);
 }

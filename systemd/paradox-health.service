@@ -13,7 +13,8 @@ ExecStart=/usr/bin/node /opt/paradox/apps/PxH/dist/index.js --config /opt/parado
 Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production
+# PAM auth helper + metrics need a normal home for IDE prune paths
+Environment=HOME=/home/paradox
 
 [Install]
 WantedBy=multi-user.target
-# Migration: also Alias=paradox-health-api.service if desired
