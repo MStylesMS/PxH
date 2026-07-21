@@ -12,6 +12,7 @@ import type { PxhConfig } from '../types.js';
 import { APP_VERSION } from '../types.js';
 import { collectMetrics } from '../metrics/collector.js';
 import { getRuntimeServices } from '../runtime/services.js';
+import { getAppVersions } from '../runtime/appVersions.js';
 import {
   runUpgrade,
   runReboot,
@@ -128,6 +129,11 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
   }));
   app.get('/runtime', async () => ({
     services: await getRuntimeServices(cfg),
+  }));
+
+  /** Git version inventory for Paradox apps (fetch on demand — not WS). */
+  app.get('/apps/versions', async () => ({
+    apps: await getAppVersions(cfg),
   }));
 
   /** Server-side probe of nginx /health/ (avoids browser cross-origin from :19090). */

@@ -45,6 +45,51 @@ export interface RuntimeServiceInfo {
   pid: number | null;
 }
 
+/** Git commit summary for Paradox app version inventory (Phase 1). */
+export interface AppCommitInfo {
+  sha: string;
+  short: string;
+  subject: string;
+  body: string;
+  author: string;
+  /** Committer date (ISO-8601 from git %cI) */
+  date: string;
+}
+
+/** Per-unit git identity from `[apps]` map + origin compare. */
+export interface AppVersionInfo {
+  name: string;
+  path: string;
+  present: boolean;
+  git: boolean;
+  /** Current branch, or null if detached HEAD */
+  branch: string | null;
+  head: AppCommitInfo | null;
+  remote: string;
+  /** Branch names on origin (without origin/ prefix) */
+  originBranches: string[];
+  /** Commits on origin/<branch> not in HEAD; null if unknown */
+  behind: number | null;
+  /** Local commits not on origin/<branch>; null if unknown */
+  ahead: number | null;
+  /** Newer commits on origin/<current-branch> (newest first), capped */
+  newerCommits: AppCommitInfo[];
+  fetchedAt: string | null;
+  error: string | null;
+}
+
+/** Default unit → checkout path conventions (overridden by [apps] in pxh.ini). */
+export const DEFAULT_APP_PATHS: Record<string, string> = {
+  'paradox-health': '/opt/paradox/apps/PxH',
+  pfx: '/opt/paradox/apps/PFx',
+  pfxe: '/opt/paradox/apps/PFxE',
+  pxo: '/opt/paradox/apps/PxO',
+  pio: '/opt/paradox/apps/PiO',
+  pxb: '/opt/paradox/apps/PxB',
+  pxt: '/opt/paradox/apps/PxT',
+  pxc: '/opt/paradox/apps/PxC',
+};
+
 export interface WarningRule {
   pattern: string;
   color: string;
@@ -89,6 +134,8 @@ export interface PxhConfig {
     optional: string[];
     user: string[];
   };
+  /** systemd unit name → absolute path to Paradox app git checkout */
+  apps: Record<string, string>;
   warnings: {
     enabled: boolean;
     historyLines: number;

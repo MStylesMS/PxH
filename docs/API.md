@@ -20,6 +20,7 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 | `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel`, optional `topConsumers` |
 | `GET` | `/services` | Configured systemd units with `state`, `tier`, `enabled` |
 | `GET` | `/runtime` | Alias of `/services` (prototype compatibility) |
+| `GET` | `/apps/versions` | Paradox app git inventory (fetch `origin`, compare current branch; on-demand) |
 | `GET` | `/reachability/nginx-health` | Server-side check that `http://127.0.0.1/health/` is up (used by `:19090` UI banner) |
 
 ### `diskRoot` (required when `/` readable)
@@ -29,6 +30,47 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 ```
 
 `diskLevel`: `ok` | `warn` | `critical` from `[thresholds]`.
+
+### `/apps/versions`
+
+LAN-visible (same as metrics). For each `[apps]` unit that is also listed under `[services]`:
+
+1. Confirm path is a git work tree
+2. `git fetch --prune origin` (uses the checkout’s configured SSH remotes)
+3. Report HEAD, current branch, origin branch names, behind/ahead vs `origin/<branch>`
+4. Include up to 50 newer commits (`sha`, `short`, `subject`, `body`, `author`, `date`)
+
+Per-app soft failures set `error` (missing path, fetch/SSH failure, detached HEAD, etc.).
+Intended for UI load / Refresh only — not attached to the WebSocket `services` channel.
+
+```json
+{
+  "apps": [
+    {
+      "name": "pxo",
+      "path": "/opt/paradox/apps/PxO",
+      "present": true,
+      "git": true,
+      "branch": "main",
+      "head": {
+        "sha": "…",
+        "short": "a1b2c3d",
+        "subject": "…",
+        "body": "",
+        "author": "…",
+        "date": "2026-07-21T12:00:00+00:00"
+      },
+      "remote": "origin",
+      "originBranches": ["main", "develop"],
+      "behind": 2,
+      "ahead": 0,
+      "newerCommits": [],
+      "fetchedAt": "2026-07-21T20:00:00.000Z",
+      "error": null
+    }
+  ]
+}
+```
 
 ---
 

@@ -12,7 +12,7 @@ repos and Node runtime updates are later phases.
 
 | Phase | Scope | Status |
 |-------|-------|--------|
-| **1** | Show installed app version (commit); detect newer commits on current branch; list origin branches; show commit messages for commits ahead of HEAD; enhance Services grid | **This plan — implement** |
+| **1** | Show installed app version (commit); detect newer commits on current branch; list origin branches; show commit messages for commits ahead of HEAD; enhance Services grid | **Implemented** |
 | **2** | Select older/newer commits on the current branch; select a different branch (checkout) | Planned |
 | **3** | Update Node runtime | Deferred (future PR / skip for now) |
 | **4** | Extend inventory + update model to other git repos already on the Pi (e.g. rooms) that have an `origin` | Planned |

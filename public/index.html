@@ -150,6 +150,51 @@
       font-size: 0.72rem;
     }
     .svc-meta { color: var(--muted); font-size: 0.7rem; flex: 1 1 100%; }
+    .svc-ver {
+      flex: 1 1 100%;
+      font-size: 0.7rem;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+    }
+    .svc-ver .sha { font-family: ui-monospace, monospace; }
+    .svc-ver .behind {
+      color: var(--warn);
+      font-weight: 600;
+      background: transparent;
+      border: 1px solid var(--warn);
+      border-radius: 4px;
+      padding: 0.05rem 0.35rem;
+      cursor: pointer;
+      font-size: 0.68rem;
+    }
+    .svc-ver .behind.open { background: color-mix(in srgb, var(--warn) 18%, transparent); }
+    .svc-ver .ver-err { color: var(--crit); }
+    .svc-ver .branches {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+    }
+    .svc-commits {
+      flex: 1 1 100%;
+      display: none;
+      margin-top: 0.15rem;
+      padding: 0.35rem 0.4rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--panel) 70%, var(--bg));
+      max-height: 160px;
+      overflow: auto;
+      font-family: ui-monospace, monospace;
+      font-size: 0.68rem;
+      line-height: 1.35;
+    }
+    .svc-commits.show { display: block; }
+    .svc-commits .cmt { margin: 0.25rem 0; white-space: pre-wrap; word-break: break-word; }
+    .svc-commits .cmt .cmt-meta { color: var(--muted); }
     .panels {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -288,6 +333,11 @@
     let activityTimer = null;
     let activityStarted = 0;
     let lastServices = [];
+    /** @type {Record<string, object>} */
+    let lastVersions = {};
+    /** @type {Set<string>} */
+    const openChangelogs = new Set();
+    let versionsLoading = false;
 
     const ACTION_BTNS = ['btn-cleanup', 'btn-prune', 'btn-upgrade', 'btn-reboot'];
 
@@ -397,6 +447,63 @@
       }
     }
 
+    function formatVerLine(v) {
+      if (!v) return '';
+      if (!v.present) {
+        return `<span class="ver-err">app path missing</span>`;
+      }
+      if (!v.git) {
+        return `<span class="ver-err">${escapeHtml(v.error || 'no git')}</span>`;
+      }
+      const branch = v.branch || '(detached)';
+      const short = v.head?.short || '?';
+      const parts = [
+        `<span class="sha">${escapeHtml(branch)} @ ${escapeHtml(short)}</span>`,
+      ];
+      if (v.behind != null && v.behind > 0) {
+        const open = openChangelogs.has(v.name) ? ' open' : '';
+        parts.push(
+          `<button type="button" class="behind${open}" data-changelog="${escapeHtml(v.name)}">${v.behind} newer</button>`,
+        );
+      } else if (v.behind === 0 && !v.error) {
+        parts.push(`<span>up to date</span>`);
+      }
+      if (v.ahead != null && v.ahead > 0) {
+        parts.push(`<span>${v.ahead} local</span>`);
+      }
+      if (v.originBranches?.length) {
+        parts.push(
+          `<span class="branches" title="${escapeHtml(v.originBranches.join(', '))}">origin: ${escapeHtml(v.originBranches.join(', '))}</span>`,
+        );
+      }
+      if (v.error) {
+        parts.push(`<span class="ver-err" title="${escapeHtml(v.error)}">fetch issue</span>`);
+      }
+      return parts.join('');
+    }
+
+    function formatChangelog(v) {
+      if (!v?.newerCommits?.length) {
+        return `<div class="cmt cmt-meta">No newer commits listed.</div>`;
+      }
+      const more =
+        v.behind != null && v.behind > v.newerCommits.length
+          ? `<div class="cmt cmt-meta">Showing ${v.newerCommits.length} of ${v.behind}…</div>`
+          : '';
+      return (
+        more +
+        v.newerCommits
+          .map((c) => {
+            const when = c.date ? c.date.slice(0, 10) : '';
+            const body = c.body
+              ? `<div class="cmt-meta">${escapeHtml(c.body)}</div>`
+              : '';
+            return `<div class="cmt"><span class="cmt-meta">${escapeHtml(c.short)}</span> ${escapeHtml(c.subject)}<div class="cmt-meta">${escapeHtml(c.author)}${when ? ` · ${escapeHtml(when)}` : ''}</div>${body}</div>`;
+          })
+          .join('')
+      );
+    }
+
     function renderServices(data) {
       const list = data.services || data || [];
       lastServices = list;
@@ -407,7 +514,6 @@
         const self = s.name === 'paradox-health';
         const dis = actionBusy ? 'disabled' : '';
         const running = s.state === 'running';
-        // Start XOR Stop; Enable XOR Disable (skip boot toggle for static/masked/self-disable)
         let runBtn = '';
         if (running) {
           runBtn = self
@@ -423,12 +529,42 @@
         } else if (en === 'disabled') {
           bootBtn = `<button type="button" data-act="enable" ${dis}>Enable</button>`;
         }
+        const ver = lastVersions[s.name];
+        let verHtml = '';
+        if (ver) {
+          verHtml = `<div class="svc-ver">${formatVerLine(ver)}</div>`;
+        } else if (versionsLoading && Object.keys(lastVersions).length === 0) {
+          verHtml = `<div class="svc-ver">checking git…</div>`;
+        }
+        const commitsOpen = ver && openChangelogs.has(s.name) ? ' show' : '';
+        const commitsHtml = ver
+          ? `<div class="svc-commits${commitsOpen}" data-commits-for="${escapeHtml(s.name)}">${formatChangelog(ver)}</div>`
+          : '';
         return `<div class="svc-row" data-name="${escapeHtml(s.name)}">
           <span class="svc ${cls}">${escapeHtml(s.name)}: ${escapeHtml(s.state)}</span>
           ${runBtn}${restartBtn}${bootBtn}
           <span class="svc-meta">${escapeHtml(s.tier)} · boot ${escapeHtml(en)}${s.pid ? ` · pid ${s.pid}` : ''}${self ? ' · (self)' : ''}</span>
+          ${verHtml}
+          ${commitsHtml}
         </div>`;
       }).join('');
+    }
+
+    async function loadVersions() {
+      versionsLoading = true;
+      renderServices({ services: lastServices });
+      try {
+        const { res, data } = await fetchJson('/apps/versions');
+        if (!res.ok) throw new Error(data?.message || 'versions failed');
+        const map = {};
+        for (const a of data.apps || []) map[a.name] = a;
+        lastVersions = map;
+      } catch (e) {
+        console.warn('[pxh] app versions', e);
+      } finally {
+        versionsLoading = false;
+        renderServices({ services: lastServices });
+      }
     }
 
     async function serviceAction(name, action) {
@@ -635,7 +771,10 @@
     }
 
     document.getElementById('btn-theme').onclick = cycleTheme;
-    document.getElementById('btn-refresh').onclick = () => pollOnce();
+    document.getElementById('btn-refresh').onclick = () => {
+      void pollOnce();
+      void loadVersions();
+    };
     document.getElementById('btn-login').onclick = () => ensureAuth();
     document.getElementById('btn-logout').onclick = async () => {
       await fetchJson('/auth/logout', { method: 'POST' });
@@ -664,6 +803,14 @@
     };
 
     document.getElementById('services').addEventListener('click', (ev) => {
+      const changelogBtn = ev.target.closest('button[data-changelog]');
+      if (changelogBtn) {
+        const name = changelogBtn.dataset.changelog;
+        if (openChangelogs.has(name)) openChangelogs.delete(name);
+        else openChangelogs.add(name);
+        renderServices({ services: lastServices });
+        return;
+      }
       const btn = ev.target.closest('button[data-act]');
       if (!btn || btn.disabled) return;
       const row = btn.closest('.svc-row');
@@ -733,8 +880,9 @@
       await refreshSession();
       await checkNginxBanner();
       connectWs();
-      // bootstrap panels via HTTP once
+      // bootstrap panels via HTTP once; git versions only on load / Refresh
       await pollOnce();
+      void loadVersions();
     })();
   </script>
 </body>
