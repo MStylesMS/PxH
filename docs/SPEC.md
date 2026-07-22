@@ -157,15 +157,17 @@ never touch `/opt/paradox` media/apps/configs.
 **UI controls (session required):** contextual Start/Stop, Restart, and Enable/Disable.
 Stop/Disable of `paradox-health` itself is refused (would take down the UI).
 
-### 7.1 Paradox app versions (Phase 1)
+### 7.1 Paradox app versions & updates (Phases 1–2)
 
 Mapped units in `[apps]` (default paths under `/opt/paradox/apps/…`) are real git checkouts
 with `origin` (SSH keys already on the host). On UI load / Refresh (not the periodic services
-poll), PxH runs `git fetch` and reports:
+poll), PxH runs `git fetch` and reports behind/HEAD for the Services grid.
 
-- Current branch + HEAD short SHA
-- Origin branch list (read-only until Phase 2)
-- Count of commits on `origin/<current-branch>` not in HEAD, plus those commit messages
+**Card:** `Update available.` when behind; gear opens an update modal (PAM session for Apply).
+
+**Apply:** `git fetch` → checkout branch → `git reset --hard <sha>` → `systemctl restart`
+(including self-update of `paradox-health`). Refuses a dirty working tree. Commit SHAs must
+be ancestors of `origin/<branch>`. Gated by `[actions] allow_app_update`.
 
 Infra units (`mosquitto`, `nginx`) stay systemd-only. See
 [pending/13-app-versions-and-updates.md](pending/13-app-versions-and-updates.md).
@@ -192,7 +194,7 @@ Infra units (`mosquitto`, `nginx`) stay systemd-only. See
 
 Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, plus a **Services** grid
 (same ~⅓ width cards as the warning panels) with contextual unit controls and, for Paradox
-apps in `[apps]`, git branch / SHA / newer-commit affordances.
+apps in `[apps]`, an update gear / “Update available.” modal for branch/commit checkout.
 
 ### 9.2 System Warnings (MQTT)
 

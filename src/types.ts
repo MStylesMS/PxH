@@ -66,6 +66,8 @@ export interface AppVersionInfo {
   branch: string | null;
   head: AppCommitInfo | null;
   remote: string;
+  /** `git remote get-url origin`, when available */
+  originUrl: string | null;
   /** Branch names on origin (without origin/ prefix) */
   originBranches: string[];
   /** Commits on origin/<branch> not in HEAD; null if unknown */
@@ -77,6 +79,29 @@ export interface AppVersionInfo {
   fetchedAt: string | null;
   error: string | null;
 }
+
+/** Branch commit list for the update modal (`GET /apps/:name/commits`). */
+export interface AppBranchCommits {
+  name: string;
+  path: string;
+  branch: string;
+  originUrl: string | null;
+  /** Current checkout branch, or null if detached */
+  currentBranch: string | null;
+  headSha: string | null;
+  head: AppCommitInfo | null;
+  /** Commits on origin/<branch> not in HEAD (when comparing current checkout) */
+  behind: number | null;
+  /** Recent commits on origin/<branch>, newest first */
+  commits: AppCommitInfo[];
+  fetchedAt: string | null;
+  error: string | null;
+}
+
+/** Select-list entries for the update modal commit dropdown. */
+export type CommitSelectOption =
+  | { kind: 'commit'; commit: AppCommitInfo; current: boolean }
+  | { kind: 'gap'; more: number };
 
 /** Default unit → checkout path conventions (overridden by [apps] in pxh.ini). */
 export const DEFAULT_APP_PATHS: Record<string, string> = {
@@ -167,6 +192,7 @@ export interface PxhConfig {
     allowService: boolean;
     allowCleanup: boolean;
     allowPruneIde: boolean;
+    allowAppUpdate: boolean;
     sessionHours: number;
     allowedUsers: string[];
     sessionSecret: string;

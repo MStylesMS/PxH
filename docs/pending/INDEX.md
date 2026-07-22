@@ -17,6 +17,6 @@ implemented against [SPEC.md](../SPEC.md) §13.
 | [10](10-premium-notify-and-remote.md) | PxP (premium) | P2 | deferred | IM push + remote summary |
 | [11](11-gameplay-jsonl-history.md) | PxO → PxP UX | P2 | deferred | Game counter, JSONL richness, history UI |
 | [12](12-snapshots-and-audit.md) | PxO / PxP / go2rtc | P3 | deferred | Snapshots, people-count, daily audit |
-| [13](13-app-versions-and-updates.md) | PxH | P1 | **Phase 1 done** (2–4 later) | Paradox app git versions + updates (phased) |
+| [13](13-app-versions-and-updates.md) | PxH | P1 | **Phase 1–2 done** (3–4 later) | Paradox app git versions + updates (phased) |
 | — | PFx (+ optional PxH) | backlog | — | TV/monitor control — see [BUSINESS-OVERVIEW § display](../BUSINESS-OVERVIEW.html#display-tv) |
 | — | PxH (+ PxB switches) | backlog | — | UPS telemetry — see [BUSINESS-OVERVIEW § UPS](../BUSINESS-OVERVIEW.html#ups) |

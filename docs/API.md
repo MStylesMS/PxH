@@ -21,6 +21,7 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 | `GET` | `/services` | Configured systemd units with `state`, `tier`, `enabled` |
 | `GET` | `/runtime` | Alias of `/services` (prototype compatibility) |
 | `GET` | `/apps/versions` | Paradox app git inventory (fetch `origin`, compare current branch; on-demand) |
+| `GET` | `/apps/:name/commits?branch=` | Recent commits on `origin/<branch>` for the update modal |
 | `GET` | `/reachability/nginx-health` | Server-side check that `http://127.0.0.1/health/` is up (used by `:19090` UI banner) |
 
 ### `diskRoot` (required when `/` readable)
@@ -37,7 +38,7 @@ LAN-visible (same as metrics). For each `[apps]` unit that is also listed under 
 
 1. Confirm path is a git work tree
 2. `git fetch --prune origin` (uses the checkout’s configured SSH remotes)
-3. Report HEAD, current branch, origin branch names, behind/ahead vs `origin/<branch>`
+3. Report HEAD, current branch, `originUrl`, origin branch names, behind/ahead vs `origin/<branch>`
 4. Include up to 50 newer commits (`sha`, `short`, `subject`, `body`, `author`, `date`)
 
 Per-app soft failures set `error` (missing path, fetch/SSH failure, detached HEAD, etc.).
@@ -61,6 +62,7 @@ Intended for UI load / Refresh only — not attached to the WebSocket `services`
         "date": "2026-07-21T12:00:00+00:00"
       },
       "remote": "origin",
+      "originUrl": "git@github.com:MStylesMS/PxO.git",
       "originBranches": ["main", "develop"],
       "behind": 2,
       "ahead": 0,
@@ -71,6 +73,11 @@ Intended for UI load / Refresh only — not attached to the WebSocket `services`
   ]
 }
 ```
+
+### `/apps/:name/commits?branch=`
+
+LAN-visible. Returns recent commits on `origin/<branch>` (newest first, capped) plus
+`currentBranch`, `headSha`, `behind`, and `originUrl` for the update modal.
 
 ---
 
@@ -136,6 +143,7 @@ Require valid session cookie. Gated by `[actions]` flags; destructive bodies nee
 | `POST` | `/actions/cleanup` | `{ "targets", "confirm", "dryRun?" }` | Clears **apt** package archives and/or **npm** cache (and optional **ide** prune). Does **not** delete media, room configs, or `/opt/paradox` apps. |
 | `POST` | `/actions/prune-ide` | `{ "confirm", "dryRun?" }` | IDE server prune (SPEC §6) |
 | `GET` | `/actions/prune-ide/preview` | — | Dry-run inventory (session required) |
+| `POST` | `/actions/app-update` | `{ "name", "branch", "sha", "confirm": true }` | Hard-reset mapped app to commit on `origin/<branch>` and `systemctl restart` (refuses dirty tree; allows self-update). Gated by `allow_app_update`. |
 
 Unauthenticated → **401**.
 

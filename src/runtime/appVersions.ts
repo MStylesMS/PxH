@@ -1,18 +1,25 @@
 /**
- * Git-based version inventory for Paradox apps (Phase 1 — read-only).
+ * Git-based version inventory for Paradox apps (Phase 1 read + Phase 2 commit lists).
  */
 
 import { existsSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { resolve } from 'node:path';
-import type { AppCommitInfo, AppVersionInfo, PxhConfig } from '../types.js';
+import type {
+  AppBranchCommits,
+  AppCommitInfo,
+  AppVersionInfo,
+  CommitSelectOption,
+  PxhConfig,
+} from '../types.js';
 
 const execFileAsync = promisify(execFile);
 
 const FETCH_TIMEOUT_MS = 45_000;
 const GIT_TIMEOUT_MS = 15_000;
 const MAX_NEWER_COMMITS = 50;
+const MAX_BRANCH_LOG = 50;
 
 async function git(
   cwd: string,
@@ -44,6 +51,7 @@ function emptyInfo(
     branch: null,
     head: null,
     remote: 'origin',
+    originUrl: null,
     originBranches: [],
     behind: null,
     ahead: null,
@@ -82,6 +90,88 @@ async function readHeadCommit(cwd: string): Promise<AppCommitInfo | null> {
   return parseCommitRecords(raw)[0] ?? null;
 }
 
+async function readOriginUrl(cwd: string): Promise<string | null> {
+  try {
+    const url = (await git(cwd, ['remote', 'get-url', 'origin'])).trim();
+    return url || null;
+  } catch {
+    return null;
+  }
+}
+
+async function listOriginBranches(cwd: string): Promise<string[]> {
+  const remoteRefs = await git(cwd, [
+    'for-each-ref',
+    '--format=%(refname:short)',
+    'refs/remotes/origin',
+  ]);
+  const originBranches = remoteRefs
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && l !== 'origin' && l !== 'origin/HEAD')
+    .map((l) => (l.startsWith('origin/') ? l.slice('origin/'.length) : l))
+    .filter((l) => l && l !== 'HEAD')
+    .sort((a, b) => a.localeCompare(b));
+  return [...new Set(originBranches)];
+}
+
+async function readCurrentBranch(cwd: string): Promise<string | null> {
+  try {
+    const b = (await git(cwd, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim();
+    return b === 'HEAD' ? null : b;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Shape the update-modal commit dropdown.
+ * - Default: up to 5 newest on origin/<branch>, current HEAD bold when present.
+ * - If viewing the current branch and behind > 4: 4 newest, gap line, then current HEAD.
+ */
+export function shapeCommitSelectOptions(args: {
+  commits: AppCommitInfo[];
+  head: AppCommitInfo | null;
+  headSha: string | null;
+  behind: number | null;
+  selectedBranch: string;
+  currentBranch: string | null;
+}): CommitSelectOption[] {
+  const { commits, head, headSha, behind, selectedBranch, currentBranch } = args;
+  const headKey = headSha || head?.sha || null;
+  const onCurrent =
+    currentBranch != null &&
+    selectedBranch === currentBranch &&
+    behind != null &&
+    behind > 4 &&
+    headKey;
+
+  if (onCurrent) {
+    const top = commits.slice(0, 4);
+    const more = behind! - 4;
+    const current =
+      head ||
+      commits.find((c) => c.sha === headKey || c.sha.startsWith(headKey!)) ||
+      null;
+    const out: CommitSelectOption[] = top.map((c) => ({
+      kind: 'commit' as const,
+      commit: c,
+      current: false,
+    }));
+    if (more > 0) out.push({ kind: 'gap', more });
+    if (current) {
+      out.push({ kind: 'commit', commit: current, current: true });
+    }
+    return out;
+  }
+
+  return commits.slice(0, 5).map((c) => ({
+    kind: 'commit' as const,
+    commit: c,
+    current: !!headKey && (c.sha === headKey || c.sha.startsWith(headKey)),
+  }));
+}
+
 async function probeOne(name: string, appPath: string): Promise<AppVersionInfo> {
   const path = resolve(appPath);
   if (!existsSync(path)) {
@@ -114,17 +204,11 @@ async function probeOne(name: string, appPath: string): Promise<AppVersionInfo> 
   });
 
   try {
-    let branch: string | null = null;
-    try {
-      const b = (await git(path, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim();
-      branch = b === 'HEAD' ? null : b;
-    } catch {
-      branch = null;
-    }
-
+    const branch = await readCurrentBranch(path);
     const head = await readHeadCommit(path);
     base.branch = branch;
     base.head = head;
+    base.originUrl = await readOriginUrl(path);
 
     try {
       await git(path, ['fetch', '--prune', 'origin'], FETCH_TIMEOUT_MS);
@@ -134,19 +218,7 @@ async function probeOne(name: string, appPath: string): Promise<AppVersionInfo> 
       // Continue with local remotes if any
     }
 
-    const remoteRefs = await git(path, [
-      'for-each-ref',
-      '--format=%(refname:short)',
-      'refs/remotes/origin',
-    ]);
-    const originBranches = remoteRefs
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l && l !== 'origin' && l !== 'origin/HEAD')
-      .map((l) => (l.startsWith('origin/') ? l.slice('origin/'.length) : l))
-      .filter((l) => l && l !== 'HEAD')
-      .sort((a, b) => a.localeCompare(b));
-    base.originBranches = [...new Set(originBranches)];
+    base.originBranches = await listOriginBranches(path);
 
     if (branch && base.originBranches.includes(branch)) {
       const remoteRef = `origin/${branch}`;
@@ -217,7 +289,135 @@ export function mappedAppEntries(
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export function resolveMappedApp(
+  cfg: PxhConfig,
+  name: string,
+): { name: string; path: string } | null {
+  return mappedAppEntries(cfg).find((e) => e.name === name) ?? null;
+}
+
 export async function getAppVersions(cfg: PxhConfig): Promise<AppVersionInfo[]> {
   const entries = mappedAppEntries(cfg);
   return Promise.all(entries.map((e) => probeOne(e.name, e.path)));
+}
+
+/** Recent commits on origin/<branch> for the update modal. */
+export async function getAppBranchCommits(
+  cfg: PxhConfig,
+  name: string,
+  branch: string,
+): Promise<AppBranchCommits> {
+  const entry = resolveMappedApp(cfg, name);
+  if (!entry) {
+    return {
+      name,
+      path: '',
+      branch,
+      originUrl: null,
+      currentBranch: null,
+      headSha: null,
+      head: null,
+      behind: null,
+      commits: [],
+      fetchedAt: null,
+      error: 'unknown or unmapped app unit',
+    };
+  }
+
+  const path = resolve(entry.path);
+  const fail = (error: string): AppBranchCommits => ({
+    name,
+    path,
+    branch,
+    originUrl: null,
+    currentBranch: null,
+    headSha: null,
+    head: null,
+    behind: null,
+    commits: [],
+    fetchedAt: null,
+    error,
+  });
+
+  if (!existsSync(path)) return fail('path not found');
+
+  try {
+    const inside = (await git(path, ['rev-parse', '--is-inside-work-tree'])).trim();
+    if (inside !== 'true') return fail('not a git work tree');
+  } catch (e) {
+    return fail(e instanceof Error ? e.message : String(e));
+  }
+
+  const currentBranch = await readCurrentBranch(path);
+  const head = await readHeadCommit(path);
+  const originUrl = await readOriginUrl(path);
+  let fetchedAt: string | null = null;
+  let error: string | null = null;
+
+  try {
+    await git(path, ['fetch', '--prune', 'origin'], FETCH_TIMEOUT_MS);
+    fetchedAt = new Date().toISOString();
+  } catch (e) {
+    error = `git fetch failed: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
+  const remoteRef = `origin/${branch}`;
+  try {
+    await git(path, ['rev-parse', '--verify', remoteRef]);
+  } catch {
+    return {
+      name,
+      path,
+      branch,
+      originUrl,
+      currentBranch,
+      headSha: head?.sha ?? null,
+      head,
+      behind: null,
+      commits: [],
+      fetchedAt,
+      error: error
+        ? `${error}; branch "${branch}" not found on origin`
+        : `branch "${branch}" not found on origin`,
+    };
+  }
+
+  let behind: number | null = null;
+  try {
+    const behindStr = (
+      await git(path, ['rev-list', '--count', `HEAD..${remoteRef}`])
+    ).trim();
+    behind = Number(behindStr) || 0;
+  } catch {
+    behind = null;
+  }
+
+  let commits: AppCommitInfo[] = [];
+  try {
+    const logRaw = await git(path, [
+      'log',
+      remoteRef,
+      `--max-count=${MAX_BRANCH_LOG}`,
+      '--format=%H%x1f%h%x1f%s%x1f%an%x1f%cI%x1f%b%x1e',
+    ]);
+    commits = parseCommitRecords(logRaw);
+  } catch (e) {
+    error =
+      (error ? `${error}; ` : '') +
+      `log failed: ${e instanceof Error ? e.message : String(e)}`;
+  }
+
+  return {
+    name,
+    path,
+    branch,
+    originUrl,
+    currentBranch,
+    headSha: head?.sha ?? null,
+    head,
+    behind,
+    commits,
+    fetchedAt,
+    error,
+  };
 }

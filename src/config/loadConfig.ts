@@ -217,6 +217,7 @@ export function loadConfig(configPath: string): PxhConfig {
       allowService: bool(a.allow_service, true),
       allowCleanup: bool(a.allow_cleanup, true),
       allowPruneIde: bool(a.allow_prune_ide, true),
+      allowAppUpdate: bool(a.allow_app_update, true),
       sessionHours: num(a.session_hours, 12),
       allowedUsers: csv(a.allowed_users).map((u) => u.toLowerCase()),
       sessionSecret,
