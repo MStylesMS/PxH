@@ -16,6 +16,25 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
+/**
+ * RAM usage from Linux MemAvailable (via systeminformation `available`).
+ * Prefer this over `mem.used` (total−free), which inflates % by counting reclaimable cache.
+ */
+export function ramFromSiMem(mem: {
+  total: number;
+  available: number;
+}): { usedMb: number; totalMb: number; usedPercent: number } {
+  const totalMb = Math.round(mem.total / 1024 / 1024);
+  const available = Number.isFinite(mem.available) ? mem.available : 0;
+  const usedBytes = Math.max(0, mem.total - available);
+  const usedPercent = mem.total > 0 ? (usedBytes / mem.total) * 100 : 0;
+  return {
+    usedMb: Math.round(usedBytes / 1024 / 1024),
+    totalMb,
+    usedPercent: round1(usedPercent),
+  };
+}
+
 export function diskLevel(disk: DiskRoot | null, cfg: PxhConfig['thresholds']): ThresholdLevel {
   if (!disk) return 'ok';
   if (
@@ -167,7 +186,6 @@ export async function collectMetrics(
     ]);
 
   const [one, five, fifteen] = loadavg();
-  const usedPercent = mem.total > 0 ? (mem.used / mem.total) * 100 : 0;
 
   const snap: MetricsSnapshot = {
     hostname: cfg.machine.hostname || osHostname(),
@@ -178,11 +196,7 @@ export async function collectMetrics(
     cpuTempC: cpuTemp,
     gpuTempC: cpuTemp,
     gpuMemMb: gpuMem,
-    ram: {
-      usedMb: Math.round(mem.used / 1024 / 1024),
-      totalMb: Math.round(mem.total / 1024 / 1024),
-      usedPercent: round1(usedPercent),
-    },
+    ram: ramFromSiMem(mem),
     diskRoot,
     diskLevel: diskLevel(diskRoot, cfg.thresholds),
     aptUpdatesAvailable: aptUpdates,

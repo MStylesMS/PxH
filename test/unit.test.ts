@@ -9,7 +9,7 @@ import {
   topicMatches,
   matchWarningColor,
 } from '../src/config/loadConfig.js';
-import { diskLevel } from '../src/metrics/collector.js';
+import { diskLevel, ramFromSiMem } from '../src/metrics/collector.js';
 import {
   mqttSystemTopic,
   mqttSystemPrefix,
@@ -74,6 +74,23 @@ describe('diskLevel', () => {
       diskLevel({ totalGb: 100, usedGb: 50, availableGb: 0.5, usedPercent: 50 }, thr),
       'critical',
     );
+  });
+});
+
+describe('ramFromSiMem', () => {
+  it('uses MemAvailable (total − available), not total − free', () => {
+    // 1795 MiB total, ~991 MiB available → ~45% used (Agent 22-like)
+    const total = 1795 * 1024 * 1024;
+    const available = 991 * 1024 * 1024;
+    const ram = ramFromSiMem({ total, available });
+    assert.equal(ram.totalMb, 1795);
+    assert.equal(ram.usedMb, 1795 - 991);
+    assert.equal(ram.usedPercent, 44.8);
+  });
+  it('clamps when available exceeds total', () => {
+    const ram = ramFromSiMem({ total: 1000, available: 2000 });
+    assert.equal(ram.usedMb, 0);
+    assert.equal(ram.usedPercent, 0);
   });
 });
 

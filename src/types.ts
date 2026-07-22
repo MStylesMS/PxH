@@ -38,6 +38,10 @@ export interface MetricsSnapshot {
   cpuTempC: number | null;
   gpuTempC: number | null;
   gpuMemMb: number | null;
+  /**
+   * RAM from MemAvailable: usedMb = total − available (reclaimable cache not counted as used).
+   * usedPercent = usedMb / totalMb.
+   */
   ram: { usedMb: number; totalMb: number; usedPercent: number };
   diskRoot: DiskRoot | null;
   diskLevel: ThresholdLevel;

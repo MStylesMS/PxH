@@ -509,7 +509,7 @@
         card('CPU', `${m.cpuPercent}%`, `load ${m.load?.one} / ${m.load?.five} / ${m.load?.fifteen}`),
         card('Temp', m.cpuTempC != null ? `${m.cpuTempC}°C` : 'n/a'),
         card('GPU mem', m.gpuMemMb != null ? `${m.gpuMemMb} MB` : 'n/a'),
-        card('RAM', `${m.ram?.usedPercent}%`, `${m.ram?.usedMb} / ${m.ram?.totalMb} MB`),
+        card('RAM', `${m.ram?.usedPercent}%`, `${m.ram?.usedMb} / ${m.ram?.totalMb} MB used (excl. cache)`),
         card('Disk', diskVal, diskSub, diskCls),
         (() => {
           const up = m.aptUpgrade;

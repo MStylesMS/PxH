@@ -1,7 +1,7 @@
 # Paradox Health Monitor (PxH) — Functional Specification
 
 _Status: MVP_  
-_Last updated: 2026-07-19_  
+_Last updated: 2026-07-22_  
 _Product:_ **Paradox Health Monitor** (**PxH**)
 
 > Former **Paradox Hub** is now **Paradox Prime (PxP)**. This repo’s **PxH** means Health Monitor only.
@@ -23,7 +23,7 @@ Informal **Machine Health** prototype on some hosts (`health-api.js` on `:19090`
 
 PxH is the **host-local health beacon** on each Paradox room machine:
 
-1. Collect host metrics (CPU, RAM, temp, **disk**, apt, …).
+1. Collect host metrics (CPU, RAM via **MemAvailable**, temp, **disk**, apt, …).
 2. Monitor configured **systemd units** (Paradox apps + system deps + optional user services).
 3. Serve a **System Health** web UI (metrics cards + warning/journal/props panels).
 4. Publish health/disk/alerts on MQTT; **subscribe** to configured warning/prop topics for the UI.

@@ -24,6 +24,16 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 | `GET` | `/apps/:name/commits?branch=` | Recent commits on `origin/<branch>` for the update modal |
 | `GET` | `/reachability/nginx-health` | Server-side check that `http://127.0.0.1/health/` is up (used by `:19090` UI banner) |
 
+### `ram`
+
+```json
+{ "usedMb": 804, "totalMb": 1795, "usedPercent": 44.8 }
+```
+
+Derived from Linux **MemAvailable** (`systeminformation` `available`):  
+`usedMb = total − available`, `usedPercent = used / total`.  
+This excludes reclaimable buff/cache (unlike `MemTotal − MemFree`, which often looks ~80–90% “full” on healthy Pis).
+
 ### `diskRoot` (required when `/` readable)
 
 ```json
