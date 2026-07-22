@@ -24,6 +24,12 @@ import { runAppUpdate } from '../src/actions/appUpdate.js';
 import { RingBuffer } from '../src/panels/ringBuffer.js';
 import { encodeSession, decodeSession } from '../src/auth/session.js';
 import type { AppCommitInfo, PxhConfig } from '../src/types.js';
+import {
+  cmdlineMatchesUnit,
+  findExtraProcesses,
+  listProcessesFromPs,
+  shortCmd,
+} from '../src/runtime/processMatch.js';
 
 describe('topicMatches', () => {
   it('matches + and exact segments', () => {
@@ -125,6 +131,7 @@ rule.1.color = pfx
     assert.equal(cfg.mqtt.topicRoot, 'paradox');
     assert.deepEqual(cfg.services.required, ['mosquitto', 'nginx']);
     assert.deepEqual(cfg.services.user, ['custom-unit']);
+    assert.equal(cfg.services.scanConflicts, true);
     assert.equal(cfg.warnings.rules[0].color, 'pfx');
     assert.equal(cfg.server.host, '0.0.0.0');
     assert.equal(cfg.apps['paradox-health'], DEFAULT_APP_PATHS['paradox-health']);
@@ -420,5 +427,41 @@ describe('session', () => {
     assert.ok(decoded);
     assert.equal(decoded!.u, 'paradox');
     assert.equal(decodeSession(cfg, 'tampered.token'), null);
+  });
+});
+
+describe('processMatch', () => {
+  it('matches known unit cmdlines', () => {
+    assert.equal(
+      cmdlineMatchesUnit('pxo', 'node /opt/paradox/apps/PxO/src/game.js --config /opt/paradox/config/pxo.ini'),
+      true,
+    );
+    assert.equal(
+      cmdlineMatchesUnit('pfx', '/usr/local/bin/node /opt/paradox/apps/PFx/pfx.js --config /x'),
+      true,
+    );
+    assert.equal(cmdlineMatchesUnit('pio', '/usr/local/bin/pio --config /opt/paradox/config/pio.ini'), true);
+    assert.equal(cmdlineMatchesUnit('pio', 'something else'), false);
+    assert.equal(cmdlineMatchesUnit('nginx', '/usr/sbin/nginx -g daemon on;'), true);
+  });
+
+  it('parses ps output and finds extras outside owned set', () => {
+    const procs = listProcessesFromPs(`
+  100 /usr/bin/node /opt/paradox/apps/PxO/src/game.js --config a
+  200 /usr/bin/node /opt/paradox/apps/PxO/src/game.js --config b
+  250 /bin/bash -c node /opt/paradox/apps/PxO/src/game.js embedded in shell text
+  300 /usr/sbin/nginx -g daemon on;
+`);
+    assert.equal(procs.length, 4);
+    const extras = findExtraProcesses('pxo', procs, new Set([100]));
+    assert.deepEqual(
+      extras.map((e) => e.pid),
+      [200],
+    );
+  });
+
+  it('shortCmd truncates', () => {
+    assert.equal(shortCmd('abc', 10), 'abc');
+    assert.equal(shortCmd('abcdefghijklmnopqrstuvwxyz', 10).endsWith('…'), true);
   });
 });

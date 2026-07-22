@@ -165,6 +165,27 @@
       font-size: 0.7rem;
       line-height: 1.25;
     }
+    .svc-conflict {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.35rem;
+      height: 1.35rem;
+      padding: 0 0.35rem;
+      border-radius: 999px;
+      border: 1px solid var(--crit);
+      background: color-mix(in srgb, var(--crit) 18%, transparent);
+      color: var(--crit);
+      font-size: 0.7rem;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .svc-conflict:hover, .svc-conflict:focus-visible {
+      background: color-mix(in srgb, var(--crit) 32%, transparent);
+      outline: none;
+    }
     .svc-update-avail {
       font-size: 0.72rem;
       font-weight: 600;
@@ -400,7 +421,7 @@
         const el = document.getElementById(id);
         if (el) el.disabled = disabled;
       }
-      document.querySelectorAll('#services button').forEach((b) => { b.disabled = disabled; });
+      document.querySelectorAll('#services button[data-act]').forEach((b) => { b.disabled = disabled; });
     }
 
     function showActivity(phase, message) {
@@ -559,6 +580,10 @@
         } else if (en === 'disabled') {
           bootBtn = `<button type="button" data-act="enable" ${dis}>Enable</button>`;
         }
+        const extras = Array.isArray(s.extraProcesses) ? s.extraProcesses : [];
+        const conflictBtn = extras.length
+          ? `<button type="button" class="svc-conflict" data-conflict="1" title="Unmanaged processes (click for PIDs)" aria-label="${extras.length} unmanaged process(es)">${extras.length}</button>`
+          : '';
         const ver = lastVersions[s.name];
         const canUpdate = !!(ver && ver.present && ver.git);
         const updateLine =
@@ -571,6 +596,7 @@
         return `<div class="svc-row${canUpdate ? ' has-gear' : ''}" data-name="${escapeHtml(s.name)}">
           <div class="svc-top">
             <span class="svc ${cls}">${escapeHtml(s.name)}: ${escapeHtml(s.state)}</span>
+            ${conflictBtn}
             ${runBtn}${restartBtn}${bootBtn}
           </div>
           <span class="svc-meta">${escapeHtml(s.tier)} · boot ${escapeHtml(en)}${s.pid ? ` · pid ${s.pid}` : ''}${self ? ' · (self)' : ''}</span>
@@ -802,6 +828,19 @@
         versionsLoading = false;
         renderServices({ services: lastServices });
       }
+    }
+
+    function showServiceConflicts(name) {
+      const svc = lastServices.find((s) => s.name === name);
+      const extras = svc?.extraProcesses || [];
+      if (!extras.length) {
+        alert(`No unmanaged processes for "${name}".`);
+        return;
+      }
+      const lines = extras.map((p) => `PID ${p.pid}${p.cmd ? `\n  ${p.cmd}` : ''}`);
+      alert(
+        `Unmanaged ${name} process(es) not owned by the systemd unit:\n\n${lines.join('\n\n')}`,
+      );
     }
 
     async function serviceAction(name, action) {
@@ -1040,6 +1079,12 @@
     };
 
     document.getElementById('services').addEventListener('click', (ev) => {
+      const conflict = ev.target.closest('button[data-conflict]');
+      if (conflict) {
+        const row = conflict.closest('.svc-row');
+        if (row) showServiceConflicts(row.dataset.name);
+        return;
+      }
       const gear = ev.target.closest('button[data-update]');
       if (gear) {
         if (gear.disabled) return;

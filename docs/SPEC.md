@@ -82,7 +82,7 @@ limits, auth, prune. Full sample: [config/pxh.example.ini](../config/pxh.example
 | `[server]` | bind host/port (`0.0.0.0` default), `serve_ui` |
 | `[machine]` | `id` (MQTT `<id>`), display hostname |
 | `[thresholds]` | disk warn/critical % and free-GB floors |
-| `[services]` | required / optional / user-defined systemd units to probe |
+| `[services]` | required / optional / user units; `scan_conflicts` (default true) |
 | `[apps]` | unit → absolute path for Paradox app git checkouts (version inventory) |
 | `[mqtt]` | broker, `topic_root` (default `paradox`), optional `topic_base` override, interval |
 | `[warnings]` | topic patterns, colors, history limits → **System Warnings** panel |
@@ -153,6 +153,12 @@ never touch `/opt/paradox` media/apps/configs.
 
 **States:** `running` | `stopped` | `failed` | `unknown`  
 **Boot:** `enabled` | `disabled` | `static` | `masked` | `unknown` (from `systemctl is-enabled`)
+
+**Unmanaged process conflicts:** For known Paradox (and select system) units, PxH also
+scans host processes by cmdline fingerprint. Any match **not** in the unit’s systemd
+cgroup is reported as `extraProcesses` (lab/dev copies or orphans). The Services UI shows
+a **red count badge**; click lists those PIDs (and short cmdlines). Disable with
+`[services] scan_conflicts = false`.
 
 **UI controls (session required):** contextual Start/Stop, Restart, and Enable/Disable.
 Stop/Disable of `paradox-health` itself is refused (would take down the UI).

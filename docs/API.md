@@ -18,7 +18,7 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 |--------|------|-------------|
 | `GET` | `/` or `/health` | `{ status, version, name }` |
 | `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel`, optional `topConsumers` |
-| `GET` | `/services` | Configured systemd units with `state`, `tier`, `enabled` |
+| `GET` | `/services` | Configured systemd units with `state`, `tier`, `enabled`, `pid`, `extraProcesses` |
 | `GET` | `/runtime` | Alias of `/services` (prototype compatibility) |
 | `GET` | `/apps/versions` | Paradox app git inventory (fetch `origin`, compare current branch; on-demand) |
 | `GET` | `/apps/:name/commits?branch=` | Recent commits on `origin/<branch>` for the update modal |
@@ -31,6 +31,24 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 ```
 
 `diskLevel`: `ok` | `warn` | `critical` from `[thresholds]`.
+
+### `/services` item shape
+
+```json
+{
+  "name": "pxo",
+  "tier": "required",
+  "state": "stopped",
+  "enabled": "disabled",
+  "pid": null,
+  "extraProcesses": [
+    { "pid": 4242, "cmd": "node /opt/paradox/apps/PxO/src/game.js --config …" }
+  ]
+}
+```
+
+`extraProcesses`: cmdline-matched app processes **not** in the unit cgroup (empty when none,
+unit has no matcher, or `[services] scan_conflicts=false`).
 
 ### `/apps/versions`
 

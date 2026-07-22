@@ -36,6 +36,12 @@ export interface MetricsSnapshot {
 
 export type ServiceTier = 'required' | 'optional' | 'user';
 
+export interface ExtraProcess {
+  pid: number;
+  /** Truncated cmdline for UI */
+  cmd: string;
+}
+
 export interface RuntimeServiceInfo {
   name: string;
   tier: ServiceTier;
@@ -43,6 +49,11 @@ export interface RuntimeServiceInfo {
   /** systemd unit enabled at boot: enabled | disabled | static | masked | unknown */
   enabled: 'enabled' | 'disabled' | 'static' | 'masked' | 'unknown';
   pid: number | null;
+  /**
+   * App processes matching this unit's fingerprint that are not in the unit
+   * cgroup (lab/dev copies, orphans). Empty when none or scanning disabled.
+   */
+  extraProcesses: ExtraProcess[];
 }
 
 /** Git commit summary for Paradox app version inventory (Phase 1). */
@@ -158,6 +169,8 @@ export interface PxhConfig {
     required: string[];
     optional: string[];
     user: string[];
+    /** Scan for unmanaged matching processes (default true). */
+    scanConflicts: boolean;
   };
   /** systemd unit name → absolute path to Paradox app git checkout */
   apps: Record<string, string>;
