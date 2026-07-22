@@ -1,31 +1,34 @@
 # Plan 06 — MQTT contract drifts (props / rooms / PxB)
 
-**Owner:** props + rooms + PxB docs · **Priority:** P1 · **Status:** pending review
+**Owner:** props + rooms + PxB docs · **Priority:** P1 · **Status:** **done** (2026-07-22)
 
-## Audit result
+## Audit result (historical)
 
 Canonical suite suffix is **`/warnings` (plural)** — no active `/warning` publishers found.
 
-| Issue | Severity | Where |
-|-------|----------|--------|
-| ESP32 `px-wifi-v1` announce default **`site/props`** vs suite/PxP catalog **`paradox/props`** | High | `props/esp32/px-wifi-v1` |
-| SpyCatcher PFx `heartbeat_topic = paradox/props` (should be heartbeat/devices, not prop announce) | High | `rooms/spycatcher/config/pfx-moscow.ini` |
-| PxB secondary docs still say **`pzb/`** while code/API use **`pxb/`** | Medium | PxB SPEC/QUICK_START/CONFIG/AI overview |
-| PxD starter `warningTopics` may omit `+/warnings` wildcards | Low | PxD templates |
+| Issue | Severity | Where | Resolution |
+|-------|----------|--------|------------|
+| ESP32 `px-wifi-v1` announce default **`site/props`** vs suite **`paradox/props`** | High | `props/esp32/px-wifi-v1` | Defaults + docs → `paradox/props`; base → `paradox/room/device` |
+| SpyCatcher PFx `heartbeat_topic = paradox/props` | High | `rooms/spycatcher/config/pfx-moscow.ini` | → `paradox/heartbeat` |
+| PxB secondary docs still said **`pzb/`** while code uses **`pxb/`** | Medium | PxB SPEC/QUICK_START/CONFIG/AI overview | Docs → `pxb/` (archive left historical) |
+| PxD / room `warningTopics` missing `paradox/+/system/alerts` | Low | SpyCatcher + some legacy room.json; PxD JS fallback | Added alerts wildcard |
 
-esp8266 props already use `paradox/props` + `/warnings`.
+esp8266 props already used `paradox/props` + `/state`; docs clarified announce-once vs periodic state.
 
-## Goal
+## Contract (locked)
 
-Align announce topic + fix heartbeat misuse + purge `pzb/` doc drift.
+| Role | Topic | Cadence |
+|------|-------|---------|
+| Prop **announce** | `paradox/props` (or `<company>/props` for third-party) | Once per MQTT connect/reconnect |
+| Prop **state / heartbeat** | `paradox/<room>/<device>/state` (`{base}/state`) | Connect, on change, ~every 10s |
+| App **warnings** | `…/warnings` (plural) | As needed |
+| PxH host alerts | `paradox/<id>/system/alerts` | Subscribe via `paradox/+/system/alerts` |
+| PxB bridge | `{base_topic}/pxb/{state,commands,warnings,discovered/…}` | Not `pzb/` |
 
 ## Acceptance
 
-- ESP32 default announce `paradox/props` (or documented migration + catalog match)
-- SpyCatcher heartbeat not on `paradox/props`
-- No `pzb/` in active PxB docs
-- Note: Pio `paradox/devices` announce is intentional (different bus)
-
-## Agent hand-off
-
-Split PR: (A) esp32 firmware/docs, (B) spycatcher ini, (C) PxB docs-only.
+- [x] ESP32 default announce `paradox/props`
+- [x] SpyCatcher PFx heartbeat not on `paradox/props`
+- [x] No `pzb/` topic paths in active PxB docs
+- [x] Room / starter warningTopics include `+/warnings` and `paradox/+/system/alerts` where applicable
+- [x] Prop docs explain announce vs state schema

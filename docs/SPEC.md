@@ -6,7 +6,7 @@ _Product:_ **Paradox Health Monitor** (**PxH**)
 
 > Former **Paradox Hub** is now **Paradox Prime (PxP)**. This repo’s **PxH** means Health Monitor only.
 
-**Related:** [API.md](API.md) · [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.md)
+**Related:** [API.md](API.md) · [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.html)
 
 ---
 
@@ -303,7 +303,7 @@ PxD starter `room.json` includes an optional **System Health** link (`/health/` 
 ## 14. Explicitly deferred
 
 Premium IM push, remote summary portal, game JSONL UX, snapshots, people-count audit, daily owner
-reports — see [BUSINESS-OVERVIEW.md](BUSINESS-OVERVIEW.md) and [pending/INDEX.md](pending/INDEX.md).
+reports — see [BUSINESS-OVERVIEW.html](BUSINESS-OVERVIEW.html) and [pending/INDEX.md](pending/INDEX.md).
 
 ---
 

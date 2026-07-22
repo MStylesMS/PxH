@@ -1,6 +1,6 @@
 # Plan 14 — UPS telemetry (PxH)
 
-**Owner:** PxH · **Priority:** P1 (post-MVP backlog) · **Status:** draft (implementation in progress)
+**Owner:** PxH · **Priority:** P1 · **Status:** **done (MVP)** — critical-battery playbook deferred to phase 2  
 **Docs:** [BUSINESS-OVERVIEW § UPS](../BUSINESS-OVERVIEW.html#ups) · [SPEC §9–10](../SPEC.md) · [API](../API.md)
 **Lab hardware (pi5-ssd):** Cyber Power / CPS S175UC, USB `0764:0501` → NUT `usbhid-ups`
 
