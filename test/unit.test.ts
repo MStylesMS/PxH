@@ -11,6 +11,13 @@ import {
 } from '../src/config/loadConfig.js';
 import { diskLevel, ramFromSiMem } from '../src/metrics/collector.js';
 import {
+  parseUpscOutput,
+  mapUpsStatus,
+  buildUpsInfoFromVars,
+  absentUps,
+  resolveRealPowerWatts,
+} from '../src/metrics/ups.js';
+import {
   mqttSystemTopic,
   mqttSystemPrefix,
   DEFAULT_APP_PATHS,
@@ -91,6 +98,78 @@ describe('ramFromSiMem', () => {
     const ram = ramFromSiMem({ total: 1000, available: 2000 });
     assert.equal(ram.usedMb, 0);
     assert.equal(ram.usedPercent, 0);
+  });
+});
+
+describe('ups metrics', () => {
+  const upsCfg = {
+    enabled: true,
+    backend: 'auto' as const,
+    nutUps: 'ups@127.0.0.1',
+    apcupsdHost: '127.0.0.1:3551',
+    batteryWarnPercent: 50,
+    batteryCriticalPercent: 20,
+    runtimeWarnMinutes: 15,
+    runtimeCriticalMinutes: 5,
+  };
+
+  it('parses upsc key: value lines', () => {
+    const vars = parseUpscOutput('battery.charge: 92\nbattery.runtime: 3600\nups.status: OL CHRG\n');
+    assert.equal(vars['battery.charge'], '92');
+    assert.equal(vars['ups.status'], 'OL CHRG');
+  });
+
+  it('maps OL / OB / LB tokens', () => {
+    assert.equal(mapUpsStatus('OL CHRG'), 'charging');
+    assert.equal(mapUpsStatus('OL'), 'online');
+    assert.equal(mapUpsStatus('OB'), 'on_battery');
+    assert.equal(mapUpsStatus('OB LB'), 'low_battery');
+  });
+
+  it('builds UpsInfo and levels on battery', () => {
+    const info = buildUpsInfoFromVars(
+      {
+        'ups.status': 'OB',
+        'battery.charge': '40',
+        'battery.runtime': '600',
+        'ups.load': '22',
+      },
+      'nut',
+      upsCfg,
+    );
+    assert.equal(info.present, true);
+    assert.equal(info.runtimeMinutes, 10);
+    assert.equal(info.status, 'on_battery');
+    assert.equal(info.level, 'warn');
+    assert.equal(info.realPowerWatts, null);
+  });
+
+  it('estimates watts from load × nominal when realpower absent', () => {
+    assert.equal(resolveRealPowerWatts(19, null, 660), 125);
+    assert.equal(resolveRealPowerWatts(22, 140, 660), 140);
+    assert.equal(resolveRealPowerWatts(null, null, 660), null);
+
+    const info = buildUpsInfoFromVars(
+      {
+        'ups.status': 'OL',
+        'battery.charge': '100',
+        'battery.runtime': '1800',
+        'ups.load': '19',
+        'ups.realpower.nominal': '660',
+      },
+      'nut',
+      upsCfg,
+    );
+    assert.equal(info.realPowerNominalWatts, 660);
+    assert.equal(info.realPowerWatts, 125);
+    assert.equal(info.status, 'online');
+  });
+
+  it('absent when disabled config path returns none', () => {
+    const a = absentUps();
+    assert.equal(a.status, 'none');
+    assert.equal(a.present, false);
+    assert.equal(a.realPowerWatts, null);
   });
 });
 

@@ -161,8 +161,9 @@
 
     <h3 id="ups">UPS monitoring (and power switching) <span class="status pending">Not started</span></h3>
     <p class="verdict"><strong>PxH owns UPS telemetry</strong> (on AC / on battery, capacity, estimated
-      runtime, load) — same family as disk and host survival. Prefer NUT (or similar) rather than
-      vendor-specific USB stacks. MQTT + System Health card + low-battery / on-battery alerts.</p>
+      runtime, load, watts when available) — same family as disk and host survival. Prefer NUT (or similar)
+      rather than vendor-specific USB stacks. MQTT + System Health card (e.g.
+      <code>Batt. 100% · On AC</code> / next line <code>Load 19% · 125 W</code>) + low-battery / on-battery alerts.</p>
     <p class="verdict"><strong>Outlet / load switching:</strong> do <em>not</em> depend on UPS
       switched-outlet groups for MVP. Use <strong>existing smart switches</strong> (WiZ, Shelly, etc.
       via PxB / already-built control) configured in the room. Native UPS outlet control may be listed

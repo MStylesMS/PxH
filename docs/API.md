@@ -17,7 +17,7 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/` or `/health` | `{ status, version, name }` |
-| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel`, optional `aptUpgrade`, optional `topConsumers` |
+| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel`, **ups**, optional `aptUpgrade`, optional `topConsumers` |
 | `GET` | `/services` | Configured systemd units with `state`, `tier`, `enabled`, `pid`, `extraProcesses` |
 | `GET` | `/runtime` | Alias of `/services` (prototype compatibility) |
 | `GET` | `/apps/versions` | Paradox app git inventory (fetch `origin`, compare current branch; on-demand) |
@@ -61,6 +61,41 @@ Written by the detached OS-upgrade worker to `/run/pxh/upgrade-status.json` and 
 
 `phase`: `heal` | `update` | `upgrade` | `done` | `error`.  
 `completed` / `total` are best-effort (from apt status / upgradable count).
+
+### `ups` (when `[ups] enabled`)
+
+```json
+{
+  "present": true,
+  "backend": "nut",
+  "name": null,
+  "model": "S175UC",
+  "mfr": "CPS",
+  "status": "online",
+  "statusRaw": "OL",
+  "batteryChargePercent": 100,
+  "runtimeSeconds": 1700,
+  "runtimeMinutes": 28,
+  "loadPercent": 22,
+  "realPowerWatts": 145,
+  "realPowerNominalWatts": 660,
+  "inputVoltage": 120,
+  "batteryVoltage": 13.6,
+  "level": "ok"
+}
+```
+
+`status`: `online` | `on_battery` | `low_battery` | `charging` | `replace_battery` | `no_comms` | `none`.  
+`realPowerWatts`: NUT `ups.realpower` when present; otherwise estimated from `loadPercent × realPowerNominalWatts / 100` when both are known. UI omits the watts segment when null.
+
+System Health UPS tile (after Updates): primary value is runtime minutes; two-line subtitle:
+
+```
+Batt. 100% · On AC
+Load 22% · 145 W
+```
+
+(Omit the second line when load and watts are both unknown.)
 
 ### `/services` item shape
 
@@ -205,6 +240,7 @@ With `topic_root=paradox` and `[machine] id=<id>`:
 |-------|----------|---------|
 | `paradox/<id>/system/health` | yes | metrics snapshot |
 | `paradox/<id>/system/disk` | yes | diskRoot + level |
+| `paradox/<id>/system/ups` | yes | `UpsInfo` (NUT/apcupsd) |
 | `paradox/<id>/system/services` | yes | services array |
 | `paradox/<id>/system/alerts` | no | `{ level, type, message, …, ts }` |
 

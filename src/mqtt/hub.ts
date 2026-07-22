@@ -3,7 +3,7 @@
  */
 
 import mqtt, { type MqttClient } from 'mqtt';
-import type { MetricsSnapshot, PanelLine, PxhConfig, ThresholdLevel } from '../types.js';
+import type { MetricsSnapshot, PanelLine, PxhConfig, ThresholdLevel, UpsStatus } from '../types.js';
 import { mqttSystemTopic } from '../types.js';
 import { matchWarningColor } from '../config/loadConfig.js';
 import type { RingBuffer } from '../panels/ringBuffer.js';
@@ -17,6 +17,8 @@ export class MqttHub {
   private lastDiskLevel: ThresholdLevel | null = null;
   private lastCriticalAffirm = 0;
   private lastServiceAlertKey = '';
+  private lastUpsStatus: UpsStatus | null = null;
+  private lastUpsCriticalAffirm = 0;
   private listeners = new Set<PanelListener>();
 
   constructor(
@@ -161,6 +163,11 @@ export class MqttHub {
         retain: true,
         qos: 0,
       });
+      this.client.publish(mqttSystemTopic(this.cfg, 'ups'), JSON.stringify(snap.ups), {
+        retain: true,
+        qos: 0,
+      });
+
 
       const crossed =
         this.lastDiskLevel !== null &&
@@ -190,6 +197,42 @@ export class MqttHub {
       }
 
       this.lastDiskLevel = snap.diskLevel;
+
+      const ups = snap.ups;
+      const upsTransition = this.lastUpsStatus !== null && this.lastUpsStatus !== ups.status;
+      const nowUps = Date.now();
+      const upsCriticalHold =
+        (ups.status === 'low_battery' || ups.level === 'critical') &&
+        nowUps - this.lastUpsCriticalAffirm > 5 * 60_000;
+
+      const publishUpsAlert = (type: string, level: ThresholdLevel, message: string) => {
+        this.client!.publish(
+          mqttSystemTopic(this.cfg, 'alerts'),
+          JSON.stringify({ level, type, message, ups, ts: snap.timestamp }),
+          { retain: false, qos: 0 },
+        );
+      };
+
+      if (upsTransition) {
+        if (ups.status === 'on_battery') {
+          publishUpsAlert('ups_on_battery', 'warn', 'UPS on battery power');
+        } else if (ups.status === 'low_battery') {
+          publishUpsAlert('ups_low_battery', 'critical', 'UPS low battery');
+          this.lastUpsCriticalAffirm = nowUps;
+        } else if (ups.status === 'online' && this.lastUpsStatus === 'on_battery') {
+          publishUpsAlert('ups_restored', 'ok', 'UPS restored to AC power');
+        } else if (ups.status === 'no_comms' && this.cfg.ups.enabled) {
+          publishUpsAlert('ups_no_comms', 'warn', 'UPS telemetry unavailable');
+        } else if (ups.status === 'replace_battery') {
+          publishUpsAlert('ups_replace_battery', 'warn', 'UPS battery replacement recommended');
+        }
+      } else if (upsCriticalHold) {
+        publishUpsAlert('ups_low_battery', 'critical', 'UPS low battery');
+        this.lastUpsCriticalAffirm = nowUps;
+      }
+
+      this.lastUpsStatus = ups.status;
+
 
       const badRequired = services.filter(
         (s) => s.tier === 'required' && (s.state === 'failed' || s.state === 'stopped'),

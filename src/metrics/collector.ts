@@ -9,6 +9,7 @@ import { resolve } from 'node:path';
 import si from 'systeminformation';
 import type { DiskRoot, MetricsSnapshot, PxhConfig, ThresholdLevel, TopConsumer } from '../types.js';
 import { getAptUpgradeMetrics } from '../actions/upgradeStatus.js';
+import { collectUps } from './ups.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -172,7 +173,7 @@ export async function collectMetrics(
   cfg: PxhConfig,
   opts?: { topConsumers?: boolean },
 ): Promise<MetricsSnapshot> {
-  const [load, mem, time, diskRoot, cpuTemp, gpuMem, aptUpdates, sudoNopasswd, aptUpgrade] =
+  const [load, mem, time, diskRoot, cpuTemp, gpuMem, aptUpdates, sudoNopasswd, aptUpgrade, ups] =
     await Promise.all([
       si.currentLoad(),
       si.mem(),
@@ -183,6 +184,7 @@ export async function collectMetrics(
       aptUpdateCount(),
       checkSudoNopasswd(),
       getAptUpgradeMetrics(),
+      collectUps(cfg),
     ]);
 
   const [one, five, fifteen] = loadavg();
@@ -201,6 +203,7 @@ export async function collectMetrics(
     diskLevel: diskLevel(diskRoot, cfg.thresholds),
     aptUpdatesAvailable: aptUpdates,
     sudoNopasswd,
+    ups,
   };
   if (aptUpgrade) {
     snap.aptUpgrade = aptUpgrade;

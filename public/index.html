@@ -111,7 +111,7 @@
     }
     .card .label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
     .card .value { font-size: 1.35rem; font-weight: 600; margin-top: 0.3rem; }
-    .card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; }
+    .card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; line-height: 1.35; }
     .card.warn-progress { border-color: var(--warn); }
     .card.warn-progress .sub { color: var(--warn); font-weight: 600; }
     .ok .value { color: var(--ok); }
@@ -496,6 +496,43 @@
       return d > 0 ? `${d}d ${h}h` : `${h}h ${m}m`;
     }
 
+
+    function upsStatusLabel(status) {
+      const map = {
+        online: 'On AC',
+        on_battery: 'On battery',
+        low_battery: 'Low battery',
+        charging: 'Charging',
+        replace_battery: 'Replace battery',
+        no_comms: 'No data',
+        none: 'Not configured',
+      };
+      return map[status] || status || '—';
+    }
+
+    function upsCard(u) {
+      if (!u || (u.status === 'none' && !u.present)) {
+        return card('UPS', 'n/a', 'UPS not configured');
+      }
+      if (u.status === 'no_comms' && !u.present) {
+        return card('UPS', 'n/a', 'No UPS data', 'warn');
+      }
+      const val =
+        u.runtimeMinutes != null ? `${u.runtimeMinutes} min` : 'n/a';
+      // Line 1: Batt. 100% · On AC
+      // Line 2: Load 19% · 125 W  (when known)
+      const line1 = [];
+      if (u.batteryChargePercent != null) line1.push(`Batt. ${u.batteryChargePercent}%`);
+      line1.push(upsStatusLabel(u.status));
+      const line2 = [];
+      if (u.loadPercent != null) line2.push(`Load ${u.loadPercent}%`);
+      if (u.realPowerWatts != null) line2.push(`${u.realPowerWatts} W`);
+      const sub = line2.length
+        ? `${line1.join(' · ')}<br>${line2.join(' · ')}`
+        : line1.join(' · ');
+      return card('UPS', val, sub, levelClass(u.level));
+    }
+
     function renderMetrics(m) {
       const disk = m.diskRoot;
       const diskCls = levelClass(m.diskLevel);
@@ -529,6 +566,7 @@
             m.aptUpdatesAvailable != null ? String(m.aptUpdatesAvailable) : 'n/a',
           );
         })(),
+        upsCard(m.ups),
         card('sudo', m.sudoNopasswd === true ? 'OK' : m.sudoNopasswd === false ? 'missing' : '?', 'NOPASSWD'),
       ].join('');
       if (!actionBusy) {
