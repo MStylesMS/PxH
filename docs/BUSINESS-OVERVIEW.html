@@ -21,15 +21,19 @@
     th { background: #efeae0; }
     .muted { color: var(--muted); font-size: 0.9rem; }
     code { font-family: ui-monospace, Consolas, monospace; font-size: 0.88em; }
+    .status { font-size: 0.78rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; }
+    .done { color: #1a7a4a; }
+    .partial { color: #9a6a10; }
+    .pending { color: #5c574e; }
   </style>
 </head>
 <body>
   <header>
     <h1>Business overview — host health vs premium ops</h1>
-    <p class="sub">Opinions for review (2026-07-18; display/UPS roadmap added later same day).
-      Links are relative to this file under <code>apps/PxH/docs/</code> so they work from any
-      machine that keeps the standard <code>…/paradox/apps/…</code> and
-      <code>…/paradox/rooms/…</code> layout.</p>
+    <p class="sub">Last updated 2026-07-22. Markdown source:
+      <a href="BUSINESS-OVERVIEW.md">BUSINESS-OVERVIEW.md</a>.
+      PxH <strong>MVP is shipped in code</strong> (plans 01, 03–05, 07 done; 08 partial).
+      Links are relative to <code>apps/PxH/docs/</code>.</p>
   </header>
   <main>
     <div class="verdict">
@@ -39,6 +43,9 @@
       Later: UPS telemetry in PxH; TV/monitor control primarily in PFx (PxH only if no PFx).
       Power switching for loads uses existing WiZ/Shelly (etc.), not UPS outlet APIs first.
     </div>
+    <p class="muted">Status key: <span class="status done">Done</span> MVP in repo ·
+      <span class="status partial">Partial</span> started or docs only ·
+      <span class="status pending">Not started</span> deferred / backlog</p>
 
     <h2>1. Product lanes</h2>
     <table>
@@ -78,63 +85,72 @@
       </tbody>
     </table>
 
-    <h2>2. Opinions (by topic)</h2>
+    <h2>2. Opinions (by topic) — with implementation status</h2>
 
-    <h3>Disk + IDE prune</h3>
+    <h3>Disk + IDE prune <span class="status done">Done</span></h3>
     <p class="verdict">Do this in PxH first (P0). The Agent22 outage is enough justification.
+      <strong>Shipped:</strong> disk metrics + thresholds, top consumers, IDE prune (dry-run, schedule, MQTT).
       Plan: <a href="pending/01-disk-and-ide-prune.md">01</a>.</p>
 
-    <h3>App log retention</h3>
+    <h3>App log retention <span class="status pending">Not started</span></h3>
     <p class="verdict">PxH cannot fix ENOSPC alone if PxO/Pio/PxT logs grow forever. Adopt a suite
       retention contract (in-app keys + optional janitor timer for sparse installs).
       Plan: <a href="pending/02-suite-log-retention.md">02</a>.</p>
 
-    <h3>Service monitoring</h3>
+    <h3>Service monitoring <span class="status done">Done</span></h3>
     <p class="verdict">Config-listed systemd units only (required / optional / user). Three-ish states
-      are enough; do not duplicate per-app deep health. Plan: <a href="pending/03-service-health.md">03</a>.</p>
+      are enough; do not duplicate per-app deep health.
+      <strong>Shipped:</strong> state + boot enablement, session-gated controls, MQTT alerts.
+      Plan: <a href="pending/03-service-health.md">03</a>.</p>
 
-    <h3>nginx vs own server</h3>
+    <h3>nginx vs own server <span class="status done">Done</span></h3>
     <p class="verdict"><strong>Both:</strong> nginx for nice URLs; PxH always on <code>:19090/ui</code> as fallback.
-      Do not hijack port 80 when nginx dies. Plan: <a href="pending/04-serve-path-and-fallback.md">04</a>.</p>
+      Do not hijack port 80 when nginx dies.
+      <strong>Shipped:</strong> reachability probe, degraded banner, nginx example + install docs.
+      Plan: <a href="pending/04-serve-path-and-fallback.md">04</a>.</p>
 
-    <h3>Warnings / journal / props / themes</h3>
+    <h3>Warnings / journal / props / themes <span class="status done">Done</span></h3>
     <p class="verdict">Yes to all three panels. Warnings colored by app (ini); journal by severity;
       props on <code>paradox/props</code>. Defaults 200/24h, 100/6h, 50/7d. Day/night/auto + toggle.
+      <strong>Shipped:</strong> MQTT subscribe, WebSocket, HTTP panels, themed UI.
       Plan: <a href="pending/05-ui-panels-and-themes.md">05</a> · sample
       <a href="../config/pxh.example.ini">pxh.example.ini</a>.</p>
 
-    <h3>MQTT spelling / props</h3>
+    <h3>MQTT spelling / props <span class="status pending">Not started</span></h3>
     <p class="verdict">Canonical <code>/warnings</code> is healthy. Fix ESP32 <code>site/props</code>, SpyCatcher
       heartbeat-on-props, and PxB <code>pzb/</code> docs. Plan: <a href="pending/06-mqtt-contract-drifts.md">06</a>.</p>
 
-    <h3>PxD landing</h3>
+    <h3>PxD landing <span class="status done">Done</span></h3>
     <p class="verdict">Optional System Health link in example <code>room.json</code> is enough.
+      <strong>Shipped:</strong> starter template + ROOMS.md.
       Plan: <a href="pending/07-pxd-landing-link.md">07</a>.</p>
 
-    <h3>PxP / Agent overlap</h3>
+    <h3>PxP / Agent overlap <span class="status partial">Partial</span></h3>
     <p class="verdict">Keep local PxH actions and remote agent actions; document lanes; avoid dual
-      disk-alert spam. Plan: <a href="pending/08-pxp-and-agent.md">08</a>.</p>
+      disk-alert spam. <strong>Shipped:</strong> SPEC §12, PxP pointers.
+      <strong>Remaining:</strong> PxP “Open System Health” per machine.
+      Plan: <a href="pending/08-pxp-and-agent.md">08</a>.</p>
 
-    <h3>pi5-ssd Hub</h3>
+    <h3>pi5-ssd Hub <span class="status pending">Not started</span></h3>
     <p class="verdict">Move the one-off off PxH defaults — do not special-case product for the lab Hub.
       Plan: <a href="pending/09-pi5-ssd-coexistence.md">09</a>.</p>
 
-    <h3>Telegram / WhatsApp / remote webpage</h3>
+    <h3>Telegram / WhatsApp / remote webpage <span class="status pending">Not started</span></h3>
     <p class="verdict"><strong>Paid PxP</strong> (or a small always-on companion), not PxH. Tokens do not belong
       on every store Pi. Plan: <a href="pending/10-premium-notify-and-remote.md">10</a>.</p>
 
-    <h3>Gameplay JSONL &amp; history</h3>
+    <h3>Gameplay JSONL &amp; history <span class="status pending">Not started</span></h3>
     <p class="verdict">PxO already writes useful JSONL — extend with game counter + hint source + dedup.
       Browsing/reporting/AI EDN edits = Prime features; raw files stay readable without Prime.
       Plan: <a href="pending/11-gameplay-jsonl-history.md">11</a> ·
       <a href="../../PxO/docs/SPEC.md">PxO SPEC</a>.</p>
 
-    <h3>Snapshots, people-count, daily audit</h3>
+    <h3>Snapshots, people-count, daily audit <span class="status pending">Not started</span></h3>
     <p class="verdict">Valuable owner features; park behind paid Prime. Prefer on-demand reports before
       inventing <code>PxP-Audit</code>. Sidecar JSON next to images for one-time AI results.
       Plan: <a href="pending/12-snapshots-and-audit.md">12</a>.</p>
 
-    <h3 id="display-tv">TV / monitor control &amp; reporting</h3>
+    <h3 id="display-tv">TV / monitor control &amp; reporting <span class="status pending">Not started</span></h3>
     <p class="verdict"><strong>One controller per machine.</strong> Prefer <strong>PFx</strong> when HDMI/media
       zones exist (already owns the display path). Optional thin implementation in <strong>PxH</strong>
       only on hosts without PFx (ops Pi, status screen). Shared MQTT contract later
@@ -143,7 +159,7 @@
     <p class="muted">Business: strong demo / “room wakes for show” story; day-to-day use is medium on
       media machines. Worth doing in PFx first; PxH fallback only if effort stays small.</p>
 
-    <h3 id="ups">UPS monitoring (and power switching)</h3>
+    <h3 id="ups">UPS monitoring (and power switching) <span class="status pending">Not started</span></h3>
     <p class="verdict"><strong>PxH owns UPS telemetry</strong> (on AC / on battery, capacity, estimated
       runtime, load) — same family as disk and host survival. Prefer NUT (or similar) rather than
       vendor-specific USB stacks. MQTT + System Health card + low-battery / on-battery alerts.</p>
@@ -155,16 +171,18 @@
     <p class="muted">Business: infrequent day-to-day use, high trust when power fails; good
       “production venue” sell signal for modest effort. Worth a PxH backlog slice after core health MVP.</p>
 
-    <h2>3. Suggested implementation order</h2>
-    <ol>
-      <li>PxH P0: 01 → 03 → 04 (disk/services/serve)</li>
-      <li>Suite P0: 02 (log retention) in parallel</li>
-      <li>PxH P1: 05 UI panels; 07 PxD link; 08 boundaries</li>
-      <li>Hygiene: 06 MQTT drifts; 09 lab coexistence</li>
-      <li>Prime roadmap: 11 → 10 → 12</li>
-      <li><strong>Later / backlog:</strong> PFx display contract (+ optional PxH-only fallback);
-        PxH UPS telemetry + alerts; power loads via WiZ/Shelly config — not UPS outlet APIs first</li>
-    </ol>
+    <h2>3. Implementation order (original vs today)</h2>
+    <table>
+      <thead><tr><th>Phase</th><th>Original</th><th>Today</th></tr></thead>
+      <tbody>
+        <tr><td>PxH P0</td><td>01 → 03 → 04</td><td><span class="status done">Done</span> in repo</td></tr>
+        <tr><td>Suite P0</td><td>02 log retention</td><td><span class="status pending">Not started</span></td></tr>
+        <tr><td>PxH P1</td><td>05; 07; 08</td><td>05, 07 <span class="status done">done</span>; 08 <span class="status partial">partial</span></td></tr>
+        <tr><td>Hygiene</td><td>06; 09</td><td><span class="status pending">Not started</span></td></tr>
+        <tr><td>Prime</td><td>11 → 10 → 12</td><td><span class="status pending">Not started</span> (by design)</td></tr>
+        <tr><td>Backlog</td><td>PFx display; PxH UPS</td><td><span class="status pending">Not started</span></td></tr>
+      </tbody>
+    </table>
 
     <h2>4. Where to store cross-repo ideas</h2>
     <div class="verdict">
@@ -179,12 +197,33 @@
 
     <h2>5. Key document map</h2>
     <ul>
-      <li><a href="SPEC.md">PxH SPEC</a> · <a href="API.md">PxH API</a> · <a href="pending/INDEX.md">Pending plans</a></li>
+      <li><a href="BUSINESS-OVERVIEW.md">Business overview (markdown)</a> · <a href="SPEC.md">PxH SPEC</a> · <a href="API.md">PxH API</a> · <a href="pending/INDEX.md">Pending plans</a></li>
       <li><a href="../../PxP/docs/MQTT_MONITOR.md">PxP MQTT Monitor</a> · <a href="../../PxP/docs/PARADOX_HEALTH_MONITOR.md">PxP pointer to PxH</a></li>
       <li><a href="../../PxP-Agent/docs/SPEC.md">PxP-Agent SPEC</a></li>
       <li><a href="../../PxO/docs/SPEC.md">PxO SPEC</a> (gameplay JSONL)</li>
       <li><a href="../../../.github/copilot-instructions.md">Suite overview</a></li>
     </ul>
+
+    <h2>6. Remaining features — business-prioritized</h2>
+    <p class="muted">Venue reliability first, then integration hygiene, then demo / upsell. Full table in
+      <a href="BUSINESS-OVERVIEW.md#6-remaining-features--business-prioritized">BUSINESS-OVERVIEW.md §6</a>.</p>
+    <table>
+      <thead><tr><th>Rank</th><th>Feature</th><th>Owner</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Suite log retention (02)</td><td>Suite</td><td>ENOSPC #1 killer; IDE prune is not enough</td></tr>
+        <tr><td>2</td><td>Fleet PxH rollout</td><td>Ops / PxH</td><td>MVP value = every host beacons</td></tr>
+        <tr><td>3</td><td>MQTT contract hygiene (06)</td><td>Props / PxB</td><td>Props panel + debugging trust</td></tr>
+        <tr><td>4</td><td>PxP “Open System Health” (08)</td><td>PxP</td><td>One-click from Prime to host UI</td></tr>
+        <tr><td>5</td><td>UPS telemetry + alerts</td><td>PxH</td><td>Professional venue power visibility</td></tr>
+        <tr><td>6</td><td>Critical-battery playbook</td><td>PxH + room</td><td>Soft shutdown &gt; UPS outlets</td></tr>
+        <tr><td>7</td><td>PFx display / TV contract</td><td>PFx</td><td>“Room wakes for show” demo</td></tr>
+        <tr><td>8</td><td>pi5-ssd coexistence (09)</td><td>Lab</td><td>Dev host port/path hygiene</td></tr>
+        <tr><td>9</td><td>Integration / field tests</td><td>PxH</td><td>Confident rollout</td></tr>
+        <tr><td>10–12</td><td>JSONL history, IM push, audit (11–12)</td><td>PxP Prime</td><td>Paid differentiators</td></tr>
+      </tbody>
+    </table>
+    <p class="verdict"><strong>Next slice:</strong> (02) + rollout in parallel → (06) + PxP link → UPS when hardware
+      confirmed → Prime items only after host health is boring everywhere.</p>
   </main>
 </body>
 </html>

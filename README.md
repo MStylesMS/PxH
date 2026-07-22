@@ -42,6 +42,7 @@ See [docs/INSTALL.md](docs/INSTALL.md) and [docs/QUICK-SETUP.md](docs/QUICK-SETU
 | [Agent 22 prompt](docs/AGENT22-SETUP-PROMPT.md) | Paste-ready agent instructions for Agent 22 |
 | [Moscow-dev prompt](docs/MOSCOW-DEV-SETUP-PROMPT.md) | Paste-ready agent instructions for SpyCatcher Moscow (`moscow-dev.local`) |
 | [Pending plans](docs/pending/INDEX.md) | Cross-repo backlog |
+| [Business overview](docs/BUSINESS-OVERVIEW.md) | Host health vs premium ops roadmap |
 
 ## License
 
