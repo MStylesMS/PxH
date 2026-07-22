@@ -17,6 +17,18 @@ export interface TopConsumer {
   sizeMb: number | null;
 }
 
+/** Detached OS-upgrade progress (from /run/pxh/upgrade-status.json). */
+export interface AptUpgradeMetrics {
+  inProgress: boolean;
+  phase: string;
+  message: string;
+  completed: number;
+  total: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  ok: boolean | null;
+}
+
 export interface MetricsSnapshot {
   hostname: string;
   timestamp: string;
@@ -30,6 +42,8 @@ export interface MetricsSnapshot {
   diskRoot: DiskRoot | null;
   diskLevel: ThresholdLevel;
   aptUpdatesAvailable: number | null;
+  /** Present when an upgrade status file exists (in progress or last result). */
+  aptUpgrade?: AptUpgradeMetrics;
   sudoNopasswd: boolean | null;
   topConsumers?: TopConsumer[];
 }

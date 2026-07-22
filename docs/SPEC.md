@@ -6,7 +6,7 @@ _Product:_ **Paradox Health Monitor** (**PxH**)
 
 > Former **Paradox Hub** is now **Paradox Prime (PxP)**. This repo’s **PxH** means Health Monitor only.
 
-**Related:** [API.md](API.md) · [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.html)
+**Related:** [API.md](API.md) · [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.md)
 
 ---
 
@@ -105,6 +105,23 @@ limits, auth, prune. Full sample: [config/pxh.example.ini](../config/pxh.example
 Sudoers: install [config/sudoers.paradox-health](../config/sudoers.paradox-health) so user `paradox`
 can run the allowlisted maintenance commands without a password prompt. See [INSTALL.md](INSTALL.md).
 
+### OS upgrade (detached)
+
+`POST /actions/upgrade` starts a **transient systemd unit** (`pxh-os-upgrade`) via
+`scripts/os-upgrade-launch.sh` and returns immediately. The worker
+(`scripts/os-upgrade.sh`) runs as root:
+
+1. Self-heal: `dpkg --configure -a` (configure only; no `apt-get -f install`)
+2. `apt-get update`
+3. Noninteractive `apt-get -y upgrade` (`DEBIAN_FRONTEND=noninteractive`, confdef/confold)
+
+Constraints:
+
+- Concurrent upgrades are refused while the unit is active
+- Runtime cap: **15 minutes** (`RuntimeMaxSec=900`)
+- Progress is written to `/run/pxh/upgrade-status.json` and mirrored on metrics as
+  `aptUpgrade` (best-effort `completed`/`total` for the Updates tile)
+
 ---
 
 ## 5. Disk space monitoring _(MVP)_
@@ -202,6 +219,10 @@ Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, plus a **Services*
 (same ~⅓ width cards as the warning panels) with contextual unit controls and, for Paradox
 apps in `[apps]`, an update gear / “Update available.” modal for branch/commit checkout.
 
+While an OS upgrade is running, the **Updates** card shows an orange
+“Update in progress…” subtitle and best-effort `(completed/total)` package progress
+from `aptUpgrade` on the metrics snapshot.
+
 ### 9.2 System Warnings (MQTT)
 
 Config-driven topic patterns + color keys; ring buffer (default 200 lines / 24h).
@@ -275,7 +296,7 @@ PxD starter `room.json` includes an optional **System Health** link (`/health/` 
 ## 14. Explicitly deferred
 
 Premium IM push, remote summary portal, game JSONL UX, snapshots, people-count audit, daily owner
-reports — see [BUSINESS-OVERVIEW.html](BUSINESS-OVERVIEW.html) and [pending/INDEX.md](pending/INDEX.md).
+reports — see [BUSINESS-OVERVIEW.md](BUSINESS-OVERVIEW.md) and [pending/INDEX.md](pending/INDEX.md).
 
 ---
 

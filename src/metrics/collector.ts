@@ -8,6 +8,7 @@ import { hostname as osHostname, loadavg, homedir } from 'node:os';
 import { resolve } from 'node:path';
 import si from 'systeminformation';
 import type { DiskRoot, MetricsSnapshot, PxhConfig, ThresholdLevel, TopConsumer } from '../types.js';
+import { getAptUpgradeMetrics } from '../actions/upgradeStatus.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -152,16 +153,18 @@ export async function collectMetrics(
   cfg: PxhConfig,
   opts?: { topConsumers?: boolean },
 ): Promise<MetricsSnapshot> {
-  const [load, mem, time, diskRoot, cpuTemp, gpuMem, aptUpdates, sudoNopasswd] = await Promise.all([
-    si.currentLoad(),
-    si.mem(),
-    si.time(),
-    readDiskRoot(),
-    readCpuTemp(),
-    readGpuMemMb(),
-    aptUpdateCount(),
-    checkSudoNopasswd(),
-  ]);
+  const [load, mem, time, diskRoot, cpuTemp, gpuMem, aptUpdates, sudoNopasswd, aptUpgrade] =
+    await Promise.all([
+      si.currentLoad(),
+      si.mem(),
+      si.time(),
+      readDiskRoot(),
+      readCpuTemp(),
+      readGpuMemMb(),
+      aptUpdateCount(),
+      checkSudoNopasswd(),
+      getAptUpgradeMetrics(),
+    ]);
 
   const [one, five, fifteen] = loadavg();
   const usedPercent = mem.total > 0 ? (mem.used / mem.total) * 100 : 0;
@@ -185,6 +188,9 @@ export async function collectMetrics(
     aptUpdatesAvailable: aptUpdates,
     sudoNopasswd,
   };
+  if (aptUpgrade) {
+    snap.aptUpgrade = aptUpgrade;
+  }
 
   if (opts?.topConsumers) {
     snap.topConsumers = await readTopConsumers();

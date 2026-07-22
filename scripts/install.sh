@@ -25,7 +25,8 @@ install -d -m 750 -o paradox -g paradox "$CONFIG_DIR"
 rsync -a --delete --exclude node_modules --exclude dist "$REPO_ROOT/" "$APP_DIR/"
 # Keep .git so System Health can report commit / origin status (Plan 13).
 cd "$APP_DIR"
-chmod +x scripts/pam-auth.py scripts/install.sh
+chmod +x scripts/pam-auth.py scripts/install.sh \
+  scripts/os-upgrade.sh scripts/os-upgrade-launch.sh
 # typescript is a devDependency — install it for build, then prune for runtime
 sudo -u paradox npm install
 sudo -u paradox npm run build

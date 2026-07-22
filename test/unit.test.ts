@@ -30,6 +30,7 @@ import {
   listProcessesFromPs,
   shortCmd,
 } from '../src/runtime/processMatch.js';
+import { parseUpgradeStatusJson } from '../src/actions/upgradeStatus.js';
 
 describe('topicMatches', () => {
   it('matches + and exact segments', () => {
@@ -463,5 +464,31 @@ describe('processMatch', () => {
   it('shortCmd truncates', () => {
     assert.equal(shortCmd('abc', 10), 'abc');
     assert.equal(shortCmd('abcdefghijklmnopqrstuvwxyz', 10).endsWith('…'), true);
+  });
+});
+
+describe('parseUpgradeStatusJson', () => {
+  it('parses a valid in-progress status', () => {
+    const st = parseUpgradeStatusJson(
+      JSON.stringify({
+        inProgress: true,
+        phase: 'upgrade',
+        message: 'Configuring firefox…',
+        completed: 3,
+        total: 10,
+        startedAt: '2026-07-22T12:00:00Z',
+        finishedAt: null,
+        ok: null,
+      }),
+    );
+    assert.ok(st);
+    assert.equal(st!.inProgress, true);
+    assert.equal(st!.completed, 3);
+    assert.equal(st!.total, 10);
+    assert.equal(st!.phase, 'upgrade');
+  });
+  it('returns null for invalid JSON or missing inProgress', () => {
+    assert.equal(parseUpgradeStatusJson('{'), null);
+    assert.equal(parseUpgradeStatusJson('{"phase":"upgrade"}'), null);
   });
 });

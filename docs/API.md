@@ -17,7 +17,7 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/` or `/health` | `{ status, version, name }` |
-| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel`, optional `topConsumers` |
+| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel`, optional `aptUpgrade`, optional `topConsumers` |
 | `GET` | `/services` | Configured systemd units with `state`, `tier`, `enabled`, `pid`, `extraProcesses` |
 | `GET` | `/runtime` | Alias of `/services` (prototype compatibility) |
 | `GET` | `/apps/versions` | Paradox app git inventory (fetch `origin`, compare current branch; on-demand) |
@@ -31,6 +31,26 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 ```
 
 `diskLevel`: `ok` | `warn` | `critical` from `[thresholds]`.
+
+### `aptUpgrade` (when status is available)
+
+Written by the detached OS-upgrade worker to `/run/pxh/upgrade-status.json` and mirrored here:
+
+```json
+{
+  "inProgress": true,
+  "phase": "upgrade",
+  "message": "Upgrading packages…",
+  "completed": 12,
+  "total": 81,
+  "startedAt": "2026-07-22T13:00:00.000Z",
+  "finishedAt": null,
+  "ok": null
+}
+```
+
+`phase`: `heal` | `update` | `upgrade` | `done` | `error`.  
+`completed` / `total` are best-effort (from apt status / upgradable count).
 
 ### `/services` item shape
 
@@ -155,7 +175,7 @@ Require valid session cookie. Gated by `[actions]` flags; destructive bodies nee
 
 | Method | Path | Body | Description |
 |--------|------|------|-------------|
-| `POST` | `/actions/upgrade` | — | apt update + upgrade (long-running; progress on WS `action`) |
+| `POST` | `/actions/upgrade` | — | Starts detached OS upgrade (`pxh-os-upgrade` systemd unit); returns immediately. Self-heal `dpkg --configure -a`, then apt update + noninteractive upgrade (15 min cap). Progress on WS `action` + metrics `aptUpgrade`. Refuses if already running. |
 | `POST` | `/actions/restart` | `{ "confirm": true }` | Host reboot (delayed) |
 | `POST` | `/actions/service` | `{ "name", "action" }` | `start`\|`stop`\|`restart`\|`enable`\|`disable` allowlisted unit |
 | `POST` | `/actions/cleanup` | `{ "targets", "confirm", "dryRun?" }` | Clears **apt** package archives and/or **npm** cache (and optional **ide** prune). Does **not** delete media, room configs, or `/opt/paradox` apps. |

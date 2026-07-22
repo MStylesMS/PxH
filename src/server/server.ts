@@ -24,6 +24,7 @@ import {
   runPruneIdeAction,
 } from '../actions/actions.js';
 import { runAppUpdate } from '../actions/appUpdate.js';
+import { startUpgradeProgressMonitor } from '../actions/upgradeStatus.js';
 import { pamAuthenticate } from '../auth/pam.js';
 import {
   clearSessionCookie,
@@ -305,15 +306,24 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
   app.post('/actions/upgrade', async (req, reply) => {
     if (!requireSession(req, reply, cfg)) return;
     broadcastAction({ phase: 'start', name: 'upgrade', message: 'Upgrade started…' });
-    const result = await runUpgrade(cfg, (step) =>
-      broadcastAction({ phase: 'progress', name: 'upgrade', message: step }),
-    );
+    const result = await runUpgrade(cfg);
+    if (result.ok && result.started) {
+      startUpgradeProgressMonitor((phase, message) =>
+        broadcastAction({ phase, name: 'upgrade', message }),
+      );
+      broadcastAction({
+        phase: 'progress',
+        name: 'upgrade',
+        message: result.message,
+      });
+      return reply.code(200).send(result);
+    }
     broadcastAction({
-      phase: result.ok ? 'done' : 'error',
+      phase: 'error',
       name: 'upgrade',
       message: result.message,
     });
-    return reply.code(result.ok ? 200 : 403).send(result);
+    return reply.code(403).send(result);
   });
 
   app.post<{ Body: { confirm?: boolean } }>('/actions/restart', async (req, reply) => {

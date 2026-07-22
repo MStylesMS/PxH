@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import type { PxhConfig } from '../types.js';
 import { allowlistedServiceNames } from '../runtime/services.js';
 import { runIdePrune, type PruneResult } from './pruneIde.js';
+import { isUpgradeInProgress, upgradeLaunchScriptPath } from './upgradeStatus.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -14,33 +15,35 @@ export type ServiceAction = 'start' | 'stop' | 'restart' | 'enable' | 'disable';
 
 export async function runUpgrade(
   cfg: PxhConfig,
-  onProgress?: (step: string) => void,
-): Promise<{ ok: boolean; message: string; steps?: string[] }> {
+): Promise<{ ok: boolean; message: string; started?: boolean; steps?: string[] }> {
   if (!cfg.actions.enabled || !cfg.actions.allowUpgrade) {
     return { ok: false, message: 'Upgrade action disabled in pxh.ini' };
   }
   if (process.platform !== 'linux') {
     return { ok: false, message: 'Upgrade is only supported on Linux' };
   }
-  const steps: string[] = [];
+  if (await isUpgradeInProgress()) {
+    return { ok: false, message: 'Upgrade already in progress' };
+  }
+
+  const launch = upgradeLaunchScriptPath();
+  const steps = ['os-upgrade-launch.sh → pxh-os-upgrade.service'];
   try {
-    onProgress?.('Running apt-get update…');
-    steps.push('apt-get update');
-    await execFileAsync('sudo', ['apt-get', 'update'], { timeout: 120_000 });
-    onProgress?.('Running apt-get -y upgrade… (may take several minutes)');
-    steps.push('apt-get -y upgrade');
-    await execFileAsync('sudo', ['apt-get', '-y', 'upgrade'], { timeout: 600_000 });
+    await execFileAsync('sudo', [launch], { timeout: 30_000 });
     return {
       ok: true,
-      message: 'Upgrade finished: apt update + upgrade completed',
+      started: true,
+      message: 'Upgrade started (detached, up to 15 minutes)',
       steps,
     };
   } catch (e) {
-    return {
-      ok: false,
-      message: e instanceof Error ? e.message : String(e),
-      steps,
-    };
+    const err = e as { code?: number | string; message?: string };
+    const msg = e instanceof Error ? e.message : String(e);
+    // launch script exits 75 when unit already active
+    if (err.code === 75 || msg.includes('already in progress')) {
+      return { ok: false, message: 'Upgrade already in progress', steps };
+    }
+    return { ok: false, message: msg, steps };
   }
 }
 

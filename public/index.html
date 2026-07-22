@@ -112,6 +112,8 @@
     .card .label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
     .card .value { font-size: 1.35rem; font-weight: 600; margin-top: 0.3rem; }
     .card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; }
+    .card.warn-progress { border-color: var(--warn); }
+    .card.warn-progress .sub { color: var(--warn); font-weight: 600; }
     .ok .value { color: var(--ok); }
     .warn .value { color: var(--warn); }
     .critical .value { color: var(--crit); }
@@ -397,6 +399,7 @@
     let actionBusy = false;
     let activityTimer = null;
     let activityStarted = 0;
+    let activityMessage = '';
     let lastServices = [];
     /** @type {Record<string, object>} */
     let lastVersions = {};
@@ -432,15 +435,18 @@
       if (phase === 'start' || phase === 'progress') {
         actionBusy = true;
         setActionButtonsDisabled(true);
+        activityMessage = message || '';
         if (phase === 'start') {
           activityStarted = Date.now();
           if (activityTimer) clearInterval(activityTimer);
           activityTimer = setInterval(() => {
             const sec = Math.round((Date.now() - activityStarted) / 1000);
-            text.textContent = `${message} (${sec}s)`;
+            text.textContent = `${activityMessage} (${sec}s)`;
           }, 500);
         }
-        text.textContent = message + (activityStarted ? ` (${Math.round((Date.now() - activityStarted) / 1000)}s)` : '');
+        text.textContent =
+          activityMessage +
+          (activityStarted ? ` (${Math.round((Date.now() - activityStarted) / 1000)}s)` : '');
       } else {
         if (activityTimer) { clearInterval(activityTimer); activityTimer = null; }
         const sec = activityStarted ? Math.round((Date.now() - activityStarted) / 1000) : 0;
@@ -505,7 +511,24 @@
         card('GPU mem', m.gpuMemMb != null ? `${m.gpuMemMb} MB` : 'n/a'),
         card('RAM', `${m.ram?.usedPercent}%`, `${m.ram?.usedMb} / ${m.ram?.totalMb} MB`),
         card('Disk', diskVal, diskSub, diskCls),
-        card('Updates', m.aptUpdatesAvailable != null ? String(m.aptUpdatesAvailable) : 'n/a'),
+        (() => {
+          const up = m.aptUpgrade;
+          if (up?.inProgress) {
+            const total = Number(up.total) || 0;
+            const completed = Number(up.completed) || 0;
+            const value =
+              total > 0
+                ? `${Math.min(completed, total)}/${total}`
+                : m.aptUpdatesAvailable != null
+                  ? String(m.aptUpdatesAvailable)
+                  : '…';
+            return card('Updates', value, 'Update in progress…', 'warn-progress');
+          }
+          return card(
+            'Updates',
+            m.aptUpdatesAvailable != null ? String(m.aptUpdatesAvailable) : 'n/a',
+          );
+        })(),
         card('sudo', m.sudoNopasswd === true ? 'OK' : m.sudoNopasswd === false ? 'missing' : '?', 'NOPASSWD'),
       ].join('');
       if (!actionBusy) {
@@ -515,6 +538,9 @@
             ? ` · top: ${m.topConsumers.slice(0, 3).map((c) => `${c.label} ${c.sizeMb}MB`).join(', ')}`
             : '');
       }
+      const upgrading = Boolean(m.aptUpgrade?.inProgress);
+      const upBtn = document.getElementById('btn-upgrade');
+      if (upBtn && !actionBusy) upBtn.disabled = upgrading;
     }
 
     function appDisplayName(v) {
@@ -1121,13 +1147,29 @@
     });
 
     document.getElementById('btn-upgrade').onclick = async () => {
-      await runLongAction(
-        'Upgrade: starting…',
-        '/actions/upgrade',
-        {},
-        'Run apt-get update + apt-get upgrade on this machine?\n\nThis can take several minutes. Progress will show above.',
-      );
-      void pollOnce();
+      const confirmMsg =
+        'Run apt-get update + apt-get upgrade on this machine?\n\n' +
+        'Runs detached (survives closing this page). Up to 15 minutes.\n' +
+        'Progress shows on the Updates tile.';
+      if (!confirm(confirmMsg)) return;
+      if (!(await ensureAuth())) return;
+      showActivity('start', 'Upgrade: starting…');
+      try {
+        const data = await postAction('/actions/upgrade', {}, { skipBusy: true });
+        if (!data) {
+          showActivity('error', 'Cancelled or auth failed');
+          return;
+        }
+        if (data.ok === false) {
+          showActivity('error', data.message || 'Failed');
+          return;
+        }
+        // Detached — keep activity in progress; WS + Updates tile follow the job
+        showActivity('start', data.message || 'Upgrade running…');
+        void pollOnce();
+      } catch (e) {
+        showActivity('error', e.message || String(e));
+      }
     };
     document.getElementById('btn-reboot').onclick = async () => {
       await runLongAction(

@@ -34,7 +34,11 @@ sudo install -m 440 /opt/paradox/apps/PxH/config/sudoers.paradox-health \
   /etc/sudoers.d/paradox-health
 sudo visudo -cf /etc/sudoers.d/paradox-health
 sudo -u paradox sudo -n apt-get clean   # should succeed with no password prompt
+sudo -u paradox sudo -l | grep os-upgrade-launch   # launch script allowlisted
 ```
+
+OS upgrade is allowlisted as the launch script only (not raw `apt-get upgrade`).
+The worker runs as root under transient unit `pxh-os-upgrade` (15 minute runtime cap).
 
 See [QUICK-SETUP.md](QUICK-SETUP.md) for first-boot config (`machine.id`, broker, nginx).
 
