@@ -134,6 +134,7 @@ export function loadConfig(configPath: string): PxhConfig {
   const p = raw.props ?? {};
   const ui = raw.ui ?? {};
   const pr = raw.prune ?? {};
+  const u = raw.ups ?? {};
 
   const hostName = osHostname();
   const machineId = str(m.id) || hostName;
@@ -146,6 +147,13 @@ export function loadConfig(configPath: string): PxhConfig {
     scheduleRaw === 'weekly' || scheduleRaw === 'manual_only' || scheduleRaw === 'low_disk'
       ? scheduleRaw
       : 'low_disk';
+
+
+  const backendRaw = str(u.backend, 'auto').toLowerCase();
+  const upsBackend: PxhConfig['ups']['backend'] =
+    backendRaw === 'nut' || backendRaw === 'apcupsd' || backendRaw === 'auto'
+      ? backendRaw
+      : 'auto';
 
   const themeRaw = str(ui.theme, 'auto').toLowerCase();
   const theme: PxhConfig['ui']['theme'] =
@@ -221,6 +229,16 @@ export function loadConfig(configPath: string): PxhConfig {
       sessionHours: num(a.session_hours, 12),
       allowedUsers: csv(a.allowed_users).map((u) => u.toLowerCase()),
       sessionSecret,
+    },
+    ups: {
+      enabled: bool(u.enabled, true),
+      backend: upsBackend,
+      nutUps: str(u.nut_ups, 'ups@127.0.0.1'),
+      apcupsdHost: str(u.apcupsd_host, '127.0.0.1:3551'),
+      batteryWarnPercent: num(u.battery_warn_percent, 50),
+      batteryCriticalPercent: num(u.battery_critical_percent, 20),
+      runtimeWarnMinutes: num(u.runtime_warn_minutes, 15),
+      runtimeCriticalMinutes: num(u.runtime_critical_minutes, 5),
     },
     prune: {
       schedule,

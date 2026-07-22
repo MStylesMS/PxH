@@ -11,6 +11,32 @@ export interface DiskRoot {
 
 export type ThresholdLevel = 'ok' | 'warn' | 'critical';
 
+export type UpsStatus =
+  | 'online'
+  | 'on_battery'
+  | 'low_battery'
+  | 'charging'
+  | 'replace_battery'
+  | 'no_comms'
+  | 'none';
+
+export interface UpsInfo {
+  present: boolean;
+  backend: 'nut' | 'apcupsd' | null;
+  name: string | null;
+  model: string | null;
+  mfr: string | null;
+  status: UpsStatus;
+  statusRaw: string | null;
+  batteryChargePercent: number | null;
+  runtimeSeconds: number | null;
+  runtimeMinutes: number | null;
+  loadPercent: number | null;
+  inputVoltage: number | null;
+  batteryVoltage: number | null;
+  level: ThresholdLevel;
+}
+
 export interface TopConsumer {
   path: string;
   label: string;
@@ -31,6 +57,7 @@ export interface MetricsSnapshot {
   diskLevel: ThresholdLevel;
   aptUpdatesAvailable: number | null;
   sudoNopasswd: boolean | null;
+  ups: UpsInfo;
   topConsumers?: TopConsumer[];
 }
 
@@ -196,6 +223,16 @@ export interface PxhConfig {
     sessionHours: number;
     allowedUsers: string[];
     sessionSecret: string;
+  };
+  ups: {
+    enabled: boolean;
+    backend: 'nut' | 'apcupsd' | 'auto';
+    nutUps: string;
+    apcupsdHost: string;
+    batteryWarnPercent: number;
+    batteryCriticalPercent: number;
+    runtimeWarnMinutes: number;
+    runtimeCriticalMinutes: number;
   };
   prune: {
     schedule: 'weekly' | 'low_disk' | 'manual_only';

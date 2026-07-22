@@ -469,6 +469,36 @@
       return d > 0 ? `${d}d ${h}h` : `${h}h ${m}m`;
     }
 
+
+    function upsStatusLabel(status) {
+      const map = {
+        online: 'On AC',
+        on_battery: 'On battery',
+        low_battery: 'Low battery',
+        charging: 'Charging',
+        replace_battery: 'Replace battery',
+        no_comms: 'No data',
+        none: 'Not configured',
+      };
+      return map[status] || status || '—';
+    }
+
+    function upsCard(u) {
+      if (!u || (u.status === 'none' && !u.present)) {
+        return card('UPS', 'n/a', 'UPS not configured');
+      }
+      if (u.status === 'no_comms' && !u.present) {
+        return card('UPS', 'n/a', 'No UPS data', 'warn');
+      }
+      const val =
+        u.runtimeMinutes != null ? `${u.runtimeMinutes} min` : 'n/a';
+      const parts = [];
+      if (u.batteryChargePercent != null) parts.push(`${u.batteryChargePercent}%`);
+      parts.push(upsStatusLabel(u.status));
+      if (u.loadPercent != null) parts.push(`load ${u.loadPercent}%`);
+      return card('UPS', val, parts.join(' · '), levelClass(u.level));
+    }
+
     function renderMetrics(m) {
       const disk = m.diskRoot;
       const diskCls = levelClass(m.diskLevel);
@@ -485,7 +515,7 @@
         card('RAM', `${m.ram?.usedPercent}%`, `${m.ram?.usedMb} / ${m.ram?.totalMb} MB`),
         card('Disk', diskVal, diskSub, diskCls),
         card('Updates', m.aptUpdatesAvailable != null ? String(m.aptUpdatesAvailable) : 'n/a'),
-        card('sudo', m.sudoNopasswd === true ? 'OK' : m.sudoNopasswd === false ? 'missing' : '?', 'NOPASSWD'),
+        upsCard(m.ups),
       ].join('');
       if (!actionBusy) {
         document.getElementById('status').textContent =

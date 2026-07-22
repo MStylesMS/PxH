@@ -70,6 +70,64 @@ describe('diskLevel', () => {
   });
 });
 
+
+import {
+  parseUpscOutput,
+  mapUpsStatus,
+  buildUpsInfoFromVars,
+  upsLevel,
+  absentUps,
+} from '../src/metrics/ups.js';
+
+describe('ups metrics', () => {
+  const upsCfg = {
+    enabled: true,
+    backend: 'auto' as const,
+    nutUps: 'ups@127.0.0.1',
+    apcupsdHost: '127.0.0.1:3551',
+    batteryWarnPercent: 50,
+    batteryCriticalPercent: 20,
+    runtimeWarnMinutes: 15,
+    runtimeCriticalMinutes: 5,
+  };
+
+  it('parses upsc key: value lines', () => {
+    const vars = parseUpscOutput('battery.charge: 92\nbattery.runtime: 3600\nups.status: OL CHRG\n');
+    assert.equal(vars['battery.charge'], '92');
+    assert.equal(vars['ups.status'], 'OL CHRG');
+  });
+
+  it('maps OL / OB / LB tokens', () => {
+    assert.equal(mapUpsStatus('OL CHRG'), 'charging');
+    assert.equal(mapUpsStatus('OL'), 'online');
+    assert.equal(mapUpsStatus('OB'), 'on_battery');
+    assert.equal(mapUpsStatus('OB LB'), 'low_battery');
+  });
+
+  it('builds UpsInfo and levels on battery', () => {
+    const info = buildUpsInfoFromVars(
+      {
+        'ups.status': 'OB',
+        'battery.charge': '40',
+        'battery.runtime': '600',
+        'ups.load': '22',
+      },
+      'nut',
+      upsCfg,
+    );
+    assert.equal(info.present, true);
+    assert.equal(info.runtimeMinutes, 10);
+    assert.equal(info.status, 'on_battery');
+    assert.equal(info.level, 'warn');
+  });
+
+  it('absent when disabled config path returns none', () => {
+    const a = absentUps();
+    assert.equal(a.status, 'none');
+    assert.equal(a.present, false);
+  });
+});
+
 describe('mqtt topics', () => {
   it('builds paradox/<id>/system/*', () => {
     const cfg = {
