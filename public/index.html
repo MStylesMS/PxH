@@ -111,7 +111,7 @@
     }
     .card .label { color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
     .card .value { font-size: 1.35rem; font-weight: 600; margin-top: 0.3rem; }
-    .card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; }
+    .card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; line-height: 1.35; }
     .ok .value { color: var(--ok); }
     .warn .value { color: var(--warn); }
     .critical .value { color: var(--crit); }
@@ -492,17 +492,18 @@
       }
       const val =
         u.runtimeMinutes != null ? `${u.runtimeMinutes} min` : 'n/a';
-      // e.g. Batt. 100% · On AC / Load 19% · 125 W
-      const parts = [];
-      if (u.batteryChargePercent != null) parts.push(`Batt. ${u.batteryChargePercent}%`);
-      const statusLabel = upsStatusLabel(u.status);
-      if (u.loadPercent != null) {
-        parts.push(`${statusLabel} / Load ${u.loadPercent}%`);
-      } else {
-        parts.push(statusLabel);
-      }
-      if (u.realPowerWatts != null) parts.push(`${u.realPowerWatts} W`);
-      return card('UPS', val, parts.join(' · '), levelClass(u.level));
+      // Line 1: Batt. 100% · On AC
+      // Line 2: Load 19% · 125 W  (when known)
+      const line1 = [];
+      if (u.batteryChargePercent != null) line1.push(`Batt. ${u.batteryChargePercent}%`);
+      line1.push(upsStatusLabel(u.status));
+      const line2 = [];
+      if (u.loadPercent != null) line2.push(`Load ${u.loadPercent}%`);
+      if (u.realPowerWatts != null) line2.push(`${u.realPowerWatts} W`);
+      const sub = line2.length
+        ? `${line1.join(' · ')}<br>${line2.join(' · ')}`
+        : line1.join(' · ');
+      return card('UPS', val, sub, levelClass(u.level));
     }
 
     function renderMetrics(m) {

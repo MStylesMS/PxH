@@ -58,8 +58,14 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 `status`: `online` | `on_battery` | `low_battery` | `charging` | `replace_battery` | `no_comms` | `none`.  
 `realPowerWatts`: NUT `ups.realpower` when present; otherwise estimated from `loadPercent × realPowerNominalWatts / 100` when both are known. UI omits the watts segment when null.
 
-System Health UPS tile (after Updates): primary value is runtime minutes; subtitle like  
-`Batt. 100% · On AC / Load 22% · 145 W`.
+System Health UPS tile (after Updates): primary value is runtime minutes; two-line subtitle:
+
+```
+Batt. 100% · On AC
+Load 22% · 145 W
+```
+
+(Omit the second line when load and watts are both unknown.)
 
 ### `/apps/versions`
 

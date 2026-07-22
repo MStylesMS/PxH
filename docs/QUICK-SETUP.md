@@ -78,8 +78,14 @@ nut_ups = cyberpower@127.0.0.1
 ```
 
 4. Restart `paradox-health`. System Health UPS tile should show runtime minutes and a
-   subtitle like `Batt. 100% · On AC / Load 19% · 125 W` (watts when NUT reports or can
-   estimate from load × nominal).
+   two-line subtitle like:
+
+   ```
+   Batt. 100% · On AC
+   Load 19% · 125 W
+   ```
+
+   (watts when NUT reports or can estimate from load × nominal).
 
 See [pending/14-ups-telemetry.md](pending/14-ups-telemetry.md). Soften NUT `upsmon`
 `SHUTDOWNCMD` if you want telemetry only (default can halt the host on low battery).

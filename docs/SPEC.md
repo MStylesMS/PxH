@@ -197,10 +197,10 @@ tile), plus a **Services** grid (same ~⅓ width cards as the warning panels) wi
 unit controls and, for Paradox apps in `[apps]`, an update gear / “Update available.” modal
 for branch/commit checkout.
 
-UPS card: primary = estimated runtime minutes; subtitle =
-`Batt. {charge}% · {On AC|On battery|…} / Load {load}% · {watts} W` (omit load/watts when
-unknown). Watts from NUT `ups.realpower`, or load% × `ups.realpower.nominal` when needed.
-See Plan 14 / `[ups]` in `pxh.ini`.
+UPS card: primary = estimated runtime minutes; two-line subtitle —
+line 1 `Batt. {charge}% · {On AC|On battery|…}`, line 2 `Load {load}% · {watts} W`
+(omit line 2 segments when unknown). Watts from NUT `ups.realpower`, or load% ×
+`ups.realpower.nominal` when needed. See Plan 14 / `[ups]` in `pxh.ini`.
 
 ### 9.2 System Warnings (MQTT)
 
