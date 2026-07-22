@@ -8,6 +8,7 @@ import { resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import ini from 'ini';
 import type { PxhConfig, WarningRule } from '../types.js';
+import { DEFAULT_APP_PATHS } from '../types.js';
 
 export const DEFAULT_CONFIG_PATHS = [
   '/opt/paradox/config/pxh.ini',
@@ -94,6 +95,24 @@ function ensureSessionSecret(
   return secret;
 }
 
+function parseAppsSection(
+  raw: Record<string, string> | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = { ...DEFAULT_APP_PATHS };
+  if (!raw) return out;
+  for (const [k, v] of Object.entries(raw)) {
+    const name = k.trim();
+    if (!name) continue;
+    const path = String(v).trim();
+    if (!path) {
+      delete out[name];
+      continue;
+    }
+    out[name] = path;
+  }
+  return out;
+}
+
 export function loadConfig(configPath: string): PxhConfig {
   let raw: Record<string, Record<string, string>> = {};
   if (existsSync(configPath)) {
@@ -107,6 +126,7 @@ export function loadConfig(configPath: string): PxhConfig {
   const mq = raw.mqtt ?? {};
   const t = raw.thresholds ?? {};
   const svc = raw.services ?? {};
+  const appsRaw = raw.apps ?? {};
   const a = raw.actions ?? {};
   const w = raw.warnings ?? {};
   const wc = raw['warnings.colors'] ?? {};
@@ -163,6 +183,7 @@ export function loadConfig(configPath: string): PxhConfig {
       optional: csv(svc.optional || 'paradox-health,pxb,pxt,pxc,pfxe,pio'),
       user: csv(svc.user),
     },
+    apps: parseAppsSection(appsRaw),
     warnings: {
       enabled: bool(w.enabled, true),
       historyLines: num(w.history_lines, 200),
@@ -196,6 +217,7 @@ export function loadConfig(configPath: string): PxhConfig {
       allowService: bool(a.allow_service, true),
       allowCleanup: bool(a.allow_cleanup, true),
       allowPruneIde: bool(a.allow_prune_ide, true),
+      allowAppUpdate: bool(a.allow_app_update, true),
       sessionHours: num(a.session_hours, 12),
       allowedUsers: csv(a.allowed_users).map((u) => u.toLowerCase()),
       sessionSecret,

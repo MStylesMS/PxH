@@ -22,7 +22,8 @@ echo "==> Installing Paradox Health Monitor (PxH) → $APP_DIR"
 install -d -m 755 -o paradox -g paradox "$APP_DIR"
 install -d -m 750 -o paradox -g paradox "$CONFIG_DIR"
 
-rsync -a --delete --exclude node_modules --exclude .git --exclude dist "$REPO_ROOT/" "$APP_DIR/"
+rsync -a --delete --exclude node_modules --exclude dist "$REPO_ROOT/" "$APP_DIR/"
+# Keep .git so System Health can report commit / origin status (Plan 13).
 cd "$APP_DIR"
 chmod +x scripts/pam-auth.py scripts/install.sh
 # typescript is a devDependency — install it for build, then prune for runtime

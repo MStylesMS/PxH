@@ -18,7 +18,7 @@ sudo bash scripts/install.sh
 
 The installer:
 
-1. Syncs the app tree to `/opt/paradox/apps/PxH`
+1. Syncs the app tree to `/opt/paradox/apps/PxH` (keeps `.git` so version inventory works)
 2. Runs `npm install`, `npm run build`, then `npm prune --omit=dev`
 3. Writes `/opt/paradox/config/pxh.ini` from the example if missing
 4. Installs `paradox-health.service` and enables it
