@@ -492,10 +492,16 @@
       }
       const val =
         u.runtimeMinutes != null ? `${u.runtimeMinutes} min` : 'n/a';
+      // e.g. Batt. 100% · On AC / Load 19% · 125 W
       const parts = [];
-      if (u.batteryChargePercent != null) parts.push(`${u.batteryChargePercent}%`);
-      parts.push(upsStatusLabel(u.status));
-      if (u.loadPercent != null) parts.push(`load ${u.loadPercent}%`);
+      if (u.batteryChargePercent != null) parts.push(`Batt. ${u.batteryChargePercent}%`);
+      const statusLabel = upsStatusLabel(u.status);
+      if (u.loadPercent != null) {
+        parts.push(`${statusLabel} / Load ${u.loadPercent}%`);
+      } else {
+        parts.push(statusLabel);
+      }
+      if (u.realPowerWatts != null) parts.push(`${u.realPowerWatts} W`);
       return card('UPS', val, parts.join(' · '), levelClass(u.level));
     }
 

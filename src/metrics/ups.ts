@@ -57,6 +57,19 @@ export function upsLevel(
   return 'ok';
 }
 
+/** Prefer `ups.realpower`; else estimate from load% × nominal watts. */
+export function resolveRealPowerWatts(
+  loadPercent: number | null,
+  realPower: number | null,
+  nominalWatts: number | null,
+): number | null {
+  if (realPower != null && realPower >= 0) return Math.round(realPower);
+  if (loadPercent != null && nominalWatts != null && nominalWatts > 0) {
+    return Math.round((loadPercent / 100) * nominalWatts);
+  }
+  return null;
+}
+
 export function buildUpsInfoFromVars(
   vars: Record<string, string>,
   backend: 'nut' | 'apcupsd',
@@ -67,6 +80,11 @@ export function buildUpsInfoFromVars(
   const runtimeMinutes =
     runtimeSeconds != null ? Math.round(runtimeSeconds / 60) : null;
   const status = mapUpsStatus(statusRaw);
+  const loadPercent = parseNum(vars['ups.load'] ?? vars['LOADPCT']);
+  const realPowerNominalWatts = parseNum(
+    vars['ups.realpower.nominal'] ?? vars['NOMPOWER'],
+  );
+  const measuredWatts = parseNum(vars['ups.realpower'] ?? vars['OUTPOW']);
   const info: UpsInfo = {
     present: true,
     backend,
@@ -78,7 +96,13 @@ export function buildUpsInfoFromVars(
     batteryChargePercent: parseNum(vars['battery.charge'] ?? vars['BCHARGE']),
     runtimeSeconds,
     runtimeMinutes,
-    loadPercent: parseNum(vars['ups.load'] ?? vars['LOADPCT']),
+    loadPercent,
+    realPowerWatts: resolveRealPowerWatts(
+      loadPercent,
+      measuredWatts,
+      realPowerNominalWatts,
+    ),
+    realPowerNominalWatts,
     inputVoltage: parseNum(vars['input.voltage'] ?? vars['LINEV']),
     batteryVoltage: parseNum(vars['battery.voltage'] ?? vars['BATTV']),
     level: 'ok',
@@ -100,6 +124,8 @@ export function absentUps(): UpsInfo {
     runtimeSeconds: null,
     runtimeMinutes: null,
     loadPercent: null,
+    realPowerWatts: null,
+    realPowerNominalWatts: null,
     inputVoltage: null,
     batteryVoltage: null,
     level: 'ok',
@@ -156,6 +182,7 @@ async function readApcupsd(hostPort: string): Promise<Record<string, string> | n
         ? String(Number(raw['TIMELEFT'].replace(/\s*Seconds/, '')) || 0)
         : '',
       'ups.load': raw['LOADPCT']?.replace(/\s*Percent/, '') ?? '',
+      'ups.realpower.nominal': raw['NOMPOWER']?.replace(/\s*Watts?/i, '') ?? '',
       'input.voltage': raw['LINEV'] ?? '',
       'battery.voltage': raw['BATTV'] ?? '',
       MODEL: raw['MODEL'] ?? '',

@@ -62,7 +62,29 @@ interval_hours = 24
 
 When `schedule` is `low_disk` or `weekly`, PxH prunes at **startup** and every `interval_hours` (and on low disk when `low_disk`). UI dry-run/execute still need a logged-in session.
 
-## 8. Smoke checklist (§13)
+## 8. UPS (optional)
+
+When a USB UPS is attached (CyberPower / APC / other NUT-supported):
+
+1. Install NUT (`nut-client`, `nut-server`), configure `usbhid-ups`, `MODE=standalone`.
+2. Confirm `upsc <name>@127.0.0.1` shows `battery.charge` and `battery.runtime`.
+3. Enable in `pxh.ini`:
+
+```ini
+[ups]
+enabled = true
+backend = nut
+nut_ups = cyberpower@127.0.0.1
+```
+
+4. Restart `paradox-health`. System Health UPS tile should show runtime minutes and a
+   subtitle like `Batt. 100% · On AC / Load 19% · 125 W` (watts when NUT reports or can
+   estimate from load × nominal).
+
+See [pending/14-ups-telemetry.md](pending/14-ups-telemetry.md). Soften NUT `upsmon`
+`SHUTDOWNCMD` if you want telemetry only (default can halt the host on low battery).
+
+## 9. Smoke checklist (§13)
 
 - [ ] `paradox-health` is active
 - [ ] UI shows non-null disk % with color bands
@@ -71,3 +93,4 @@ When `schedule` is `low_disk` or `weekly`, PxH prunes at **startup** and every `
 - [ ] Warnings panel shows live `/warnings` traffic
 - [ ] IDE prune dry-run lists builds; execute requires login
 - [ ] Theme day/night/auto + header toggle
+- [ ] If UPS configured: tile shows Batt. % / On AC (or On battery) and watts when available

@@ -192,9 +192,15 @@ Infra units (`mosquitto`, `nginx`) stay systemd-only. See
 
 ### 9.1 Metrics cards
 
-Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, plus a **Services** grid
-(same ~⅓ width cards as the warning panels) with contextual unit controls and, for Paradox
-apps in `[apps]`, an update gear / “Update available.” modal for branch/commit checkout.
+Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, **UPS** (after Updates; no sudo
+tile), plus a **Services** grid (same ~⅓ width cards as the warning panels) with contextual
+unit controls and, for Paradox apps in `[apps]`, an update gear / “Update available.” modal
+for branch/commit checkout.
+
+UPS card: primary = estimated runtime minutes; subtitle =
+`Batt. {charge}% · {On AC|On battery|…} / Load {load}% · {watts} W` (omit load/watts when
+unknown). Watts from NUT `ups.realpower`, or load% × `ups.realpower.nominal` when needed.
+See Plan 14 / `[ups]` in `pxh.ini`.
 
 ### 9.2 System Warnings (MQTT)
 
@@ -226,10 +232,11 @@ With `topic_root=paradox` (default) and machine `id`:
 
 | Topic | Retained | Content |
 |-------|----------|---------|
-| `paradox/<id>/system/health` | yes | Metrics snapshot |
+| `paradox/<id>/system/health` | yes | Metrics snapshot (includes `ups` when enabled) |
 | `paradox/<id>/system/disk` | yes | diskRoot + level |
+| `paradox/<id>/system/ups` | yes | UPS snapshot (`UpsInfo`) |
 | `paradox/<id>/system/services` | yes | Unit states summary |
-| `paradox/<id>/system/alerts` | **no** | Threshold / service alerts (critical reaffirm while active) |
+| `paradox/<id>/system/alerts` | **no** | Threshold / service / UPS alerts (critical reaffirm while active) |
 
 Do **not** overload suite app `/warnings` topics; PxH system alerts stay under `…/system/alerts`.
 Broker is often local but must be configurable.

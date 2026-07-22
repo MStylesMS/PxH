@@ -32,6 +32,10 @@ export interface UpsInfo {
   runtimeSeconds: number | null;
   runtimeMinutes: number | null;
   loadPercent: number | null;
+  /** Instantaneous watts when known (`ups.realpower`, or load% × nominal). */
+  realPowerWatts: number | null;
+  /** Nameplate watts (`ups.realpower.nominal`) when reported. */
+  realPowerNominalWatts: number | null;
   inputVoltage: number | null;
   batteryVoltage: number | null;
   level: ThresholdLevel;

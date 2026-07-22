@@ -32,6 +32,35 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 
 `diskLevel`: `ok` | `warn` | `critical` from `[thresholds]`.
 
+### `ups` (when `[ups] enabled`)
+
+```json
+{
+  "present": true,
+  "backend": "nut",
+  "name": null,
+  "model": "S175UC",
+  "mfr": "CPS",
+  "status": "online",
+  "statusRaw": "OL",
+  "batteryChargePercent": 100,
+  "runtimeSeconds": 1700,
+  "runtimeMinutes": 28,
+  "loadPercent": 22,
+  "realPowerWatts": 145,
+  "realPowerNominalWatts": 660,
+  "inputVoltage": 120,
+  "batteryVoltage": 13.6,
+  "level": "ok"
+}
+```
+
+`status`: `online` | `on_battery` | `low_battery` | `charging` | `replace_battery` | `no_comms` | `none`.  
+`realPowerWatts`: NUT `ups.realpower` when present; otherwise estimated from `loadPercent × realPowerNominalWatts / 100` when both are known. UI omits the watts segment when null.
+
+System Health UPS tile (after Updates): primary value is runtime minutes; subtitle like  
+`Batt. 100% · On AC / Load 22% · 145 W`.
+
 ### `/apps/versions`
 
 LAN-visible (same as metrics). For each `[apps]` unit that is also listed under `[services]`:

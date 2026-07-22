@@ -26,7 +26,9 @@ and MQTT — without vendor-specific USB stacks inside Node.
 2. **Add** a `UPS` card immediately after `Updates`.
 3. Card presentation:
    - **Value (primary):** estimated runtime — e.g. `42 min` (from `battery.runtime` seconds ÷ 60), or `n/a` if absent.
-   - **Sub line:** `battery.charge`% · status text · load% when known.
+   - **Sub line:** `Batt. {charge}% · {status} / Load {load}% · {watts} W` when fields exist.
+     Example: `Batt. 100% · On AC / Load 19% · 125 W`. Omit load and/or watts segments when unknown.
+   - **Watts:** use NUT `ups.realpower` when present; otherwise estimate `round(load% × ups.realpower.nominal / 100)` when both load and nominal are known (common on CyberPower HID).
    - **Color bands** (`ok` / `warn` / `critical`) from UPS level (see thresholds).
 4. When no UPS / NUT unavailable: value `n/a`, sub `UPS not configured` (not an error banner).
 5. Keep `sudoNopasswd` in `/metrics` for action gating if useful; just don’t show a tile.
@@ -62,6 +64,8 @@ Extend `MetricsSnapshot` with `UpsInfo` (see `src/types.ts`).
 | `battery.charge` | `batteryChargePercent` |
 | `battery.runtime` | `runtimeSeconds` → `runtimeMinutes` |
 | `ups.load` | `loadPercent` |
+| `ups.realpower` | `realPowerWatts` (preferred) |
+| `ups.realpower.nominal` | `realPowerNominalWatts`; also used to estimate watts when `ups.realpower` absent |
 | `input.voltage` | `inputVoltage` |
 | `battery.voltage` | `batteryVoltage` |
 | `ups.model` / `device.model` | `model` |
@@ -102,7 +106,7 @@ Alert `type` values: `ups_on_battery`, `ups_low_battery`, `ups_restored`, `ups_n
 ## Acceptance
 
 1. sudo card gone from System Health; UPS card sits after Updates.
-2. With CyberPower USB + NUT configured on lab Pi: tile shows runtime minutes, charge %, On AC / On battery.
+2. With CyberPower USB + NUT configured on lab Pi: tile shows runtime minutes and subline `Batt. …% · On AC / Load …% · … W` (watts when measurable or estimable).
 3. Unplug AC (safe test): status → on battery within one poll; MQTT `ups_on_battery` alert fires; restore → `ups_restored`.
 4. APC path documented: either NUT `usbhid-ups` or `apcupsd` + bridge; same `UpsInfo` shape.
 5. No UPS / NUT down: `ups.present=false`, UI `n/a`, no false critical on host health.

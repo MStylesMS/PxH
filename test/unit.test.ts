@@ -77,6 +77,7 @@ import {
   buildUpsInfoFromVars,
   upsLevel,
   absentUps,
+  resolveRealPowerWatts,
 } from '../src/metrics/ups.js';
 
 describe('ups metrics', () => {
@@ -119,12 +120,35 @@ describe('ups metrics', () => {
     assert.equal(info.runtimeMinutes, 10);
     assert.equal(info.status, 'on_battery');
     assert.equal(info.level, 'warn');
+    assert.equal(info.realPowerWatts, null);
+  });
+
+  it('estimates watts from load × nominal when realpower absent', () => {
+    assert.equal(resolveRealPowerWatts(19, null, 660), 125);
+    assert.equal(resolveRealPowerWatts(22, 140, 660), 140);
+    assert.equal(resolveRealPowerWatts(null, null, 660), null);
+
+    const info = buildUpsInfoFromVars(
+      {
+        'ups.status': 'OL',
+        'battery.charge': '100',
+        'battery.runtime': '1800',
+        'ups.load': '19',
+        'ups.realpower.nominal': '660',
+      },
+      'nut',
+      upsCfg,
+    );
+    assert.equal(info.realPowerNominalWatts, 660);
+    assert.equal(info.realPowerWatts, 125);
+    assert.equal(info.status, 'online');
   });
 
   it('absent when disabled config path returns none', () => {
     const a = absentUps();
     assert.equal(a.status, 'none');
     assert.equal(a.present, false);
+    assert.equal(a.realPowerWatts, null);
   });
 });
 
