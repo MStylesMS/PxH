@@ -1,6 +1,6 @@
 # Plan 07 — PxD landing link to System Health
 
-**Owner:** PxD (+ room packages) · **Priority:** P1 · **Status:** pending review
+**Owner:** PxD (+ room packages) · **Priority:** P1 · **Status:** done (starter + Houdini room + docs; Agent22 via AGENT22-SETUP-PROMPT.md)
 
 ## Goal
 

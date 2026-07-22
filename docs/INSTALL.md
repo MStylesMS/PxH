@@ -38,6 +38,12 @@ sudo -u paradox sudo -n apt-get clean   # should succeed with no password prompt
 
 See [QUICK-SETUP.md](QUICK-SETUP.md) for first-boot config (`machine.id`, broker, nginx).
 
+**Agent 22 install prompt** (paste into a Cursor session on that host):
+[AGENT22-SETUP-PROMPT.md](AGENT22-SETUP-PROMPT.md).
+
+**SpyCatcher Moscow (moscow-dev) install prompt:**
+[MOSCOW-DEV-SETUP-PROMPT.md](MOSCOW-DEV-SETUP-PROMPT.md).
+
 ## nginx (preferred operator URL)
 
 Merge [config/nginx-health.example.conf](../config/nginx-health.example.conf) into the venue site:
