@@ -6,7 +6,7 @@ _Product:_ **Paradox Health Monitor** (**PxH**)
 
 > Former **Paradox Hub** is now **Paradox Prime (PxP)**. This repo’s **PxH** means Health Monitor only.
 
-**Related:** [API.md](API.md) · [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.html)
+**Related:** [API.md](API.md) · [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.html) · [suite standards](standards/)
 
 ---
 

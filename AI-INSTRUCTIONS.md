@@ -20,10 +20,17 @@ Former Hub product is **PxP**, not this repo.
 
 ## Docs
 
-- [docs/SPEC.md](docs/SPEC.md) — contract
+- [docs/SPEC.md](docs/SPEC.md) — product contract
 - [docs/API.md](docs/API.md) — HTTP + MQTT
+- [docs/standards/](docs/standards/) — **suite-wide standards** (MQTT contract and more); change here first, then propagate
 
 Update docs in the same change as behaviour. Commit prefixes: `Docs:`, `Implement:`, `Fix:`, …
+
+## Suite standards
+
+Suite-wide contracts live in [docs/standards/](docs/standards/) (folder, not a single file).
+Read those before changing MQTT topics or shared conventions. If you change a standard, update
+the file under PxH first and propagate to other repos’ docs in the same work.
 
 ## Layout
 

@@ -2,6 +2,8 @@
 
 **Owner:** props + rooms + PxB docs · **Priority:** P1 · **Status:** **done** (2026-07-22)
 
+**Canonical contract:** [suite MQTT-CONTRACT](../standards/MQTT-CONTRACT.md) (under `docs/standards/`).
+
 ## Audit result (historical)
 
 Canonical suite suffix is **`/warnings` (plural)** — no active `/warning` publishers found.
