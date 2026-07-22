@@ -129,12 +129,23 @@
       #services { grid-template-columns: 1fr; }
     }
     .svc-row {
-      display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.3rem;
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 0.45rem 0.65rem;
       min-width: 0;
+    }
+    .svc-row.has-gear { padding-right: 2rem; }
+    .svc-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
     }
     .svc {
       font-size: 0.8rem;
@@ -149,7 +160,60 @@
       padding: 0.25rem 0.55rem;
       font-size: 0.72rem;
     }
-    .svc-meta { color: var(--muted); font-size: 0.7rem; flex: 1 1 100%; }
+    .svc-meta {
+      color: var(--muted);
+      font-size: 0.7rem;
+      line-height: 1.25;
+    }
+    .svc-update-avail {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--warn);
+    }
+    .svc-gear {
+      position: absolute;
+      top: 0.35rem;
+      right: 0.4rem;
+      width: 1.5rem;
+      height: 1.5rem;
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      border-radius: 4px;
+    }
+    .svc-gear:hover { color: var(--text); background: color-mix(in srgb, var(--border) 40%, transparent); }
+    .svc-gear:disabled { opacity: 0.45; cursor: not-allowed; }
+    #update-dialog label { display: block; margin-top: 0.65rem; font-size: 0.8rem; color: var(--muted); }
+    #update-dialog select {
+      width: 100%;
+      margin-top: 0.25rem;
+      padding: 0.4rem 0.5rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+    #update-dialog option.current-opt { font-weight: 700; }
+    #update-dialog .origin-url {
+      font-family: ui-monospace, monospace;
+      font-size: 0.75rem;
+      word-break: break-all;
+      color: var(--muted);
+      margin: 0.15rem 0 0;
+    }
+    #update-dialog #update-status {
+      min-height: 1.1em;
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+      color: var(--muted);
+    }
+    #update-dialog #update-status.err { color: var(--crit); }
+    #update-leave-dialog p { font-size: 0.9rem; line-height: 1.4; margin: 0.5rem 0 0; }
     .panels {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -270,6 +334,31 @@
     </form>
   </dialog>
 
+  <dialog id="update-dialog">
+    <h2 style="text-transform:none;color:var(--text);margin:0" id="update-title">Update app</h2>
+    <p class="origin-url" id="update-origin"></p>
+    <label for="update-branch">Branch</label>
+    <select id="update-branch"></select>
+    <label for="update-commit">Commit</label>
+    <select id="update-commit"></select>
+    <div id="update-status"></div>
+    <div class="row">
+      <button type="button" id="update-cancel">Close</button>
+      <button type="button" class="primary" id="update-apply" disabled>Apply</button>
+    </div>
+  </dialog>
+
+  <dialog id="update-leave-dialog">
+    <h2 style="text-transform:none;color:var(--text);margin:0">Update in progress</h2>
+    <p>
+      Navigating away or closing this window before the process completes will likely corrupt the update.
+    </p>
+    <div class="row">
+      <button type="button" id="update-leave-continue" class="primary">Continue with Update</button>
+      <button type="button" class="danger" id="update-leave-abort">Cancel Update (not advised)</button>
+    </div>
+  </dialog>
+
   <script>
     const API = (function resolveApi() {
       if (location.pathname.startsWith('/health')) return '/health-api';
@@ -288,6 +377,16 @@
     let activityTimer = null;
     let activityStarted = 0;
     let lastServices = [];
+    /** @type {Record<string, object>} */
+    let lastVersions = {};
+    let versionsLoading = false;
+    /** @type {AbortController | null} */
+    let updateAbort = null;
+    let updateInProgress = false;
+    /** @type {{ name: string, path: string, originUrl: string | null, branch: string | null, headSha: string | null, originBranches: string[] } | null} */
+    let updateCtx = null;
+    /** @type {{ branch: string, headSha: string | null, currentBranch: string | null, behind: number | null, commits: object[], head: object | null } | null} */
+    let updateCommitData = null;
 
     const ACTION_BTNS = ['btn-cleanup', 'btn-prune', 'btn-upgrade', 'btn-reboot'];
 
@@ -397,6 +496,44 @@
       }
     }
 
+    function appDisplayName(v) {
+      if (!v?.path) return v?.name || '';
+      const parts = String(v.path).replace(/\/+$/, '').split('/');
+      return parts[parts.length - 1] || v.name;
+    }
+
+    /** Mirror server shapeCommitSelectOptions for the modal dropdown. */
+    function shapeCommitSelectOptions(data, selectedBranch) {
+      const commits = data.commits || [];
+      const head = data.head || null;
+      const headSha = data.headSha || head?.sha || null;
+      const behind = data.behind;
+      const currentBranch = data.currentBranch;
+      const onCurrent =
+        currentBranch != null &&
+        selectedBranch === currentBranch &&
+        behind != null &&
+        behind > 4 &&
+        headSha;
+      if (onCurrent) {
+        const top = commits.slice(0, 4);
+        const more = behind - 4;
+        const current =
+          head ||
+          commits.find((c) => c.sha === headSha || c.sha.startsWith(headSha)) ||
+          null;
+        const out = top.map((c) => ({ kind: 'commit', commit: c, current: false }));
+        if (more > 0) out.push({ kind: 'gap', more });
+        if (current) out.push({ kind: 'commit', commit: current, current: true });
+        return out;
+      }
+      return commits.slice(0, 5).map((c) => ({
+        kind: 'commit',
+        commit: c,
+        current: !!headSha && (c.sha === headSha || c.sha.startsWith(headSha)),
+      }));
+    }
+
     function renderServices(data) {
       const list = data.services || data || [];
       lastServices = list;
@@ -405,9 +542,8 @@
         const cls = [s.state, s.tier === 'required' ? 'required' : ''].filter(Boolean).join(' ');
         const en = s.enabled || 'unknown';
         const self = s.name === 'paradox-health';
-        const dis = actionBusy ? 'disabled' : '';
+        const dis = actionBusy || updateInProgress ? 'disabled' : '';
         const running = s.state === 'running';
-        // Start XOR Stop; Enable XOR Disable (skip boot toggle for static/masked/self-disable)
         let runBtn = '';
         if (running) {
           runBtn = self
@@ -423,12 +559,249 @@
         } else if (en === 'disabled') {
           bootBtn = `<button type="button" data-act="enable" ${dis}>Enable</button>`;
         }
-        return `<div class="svc-row" data-name="${escapeHtml(s.name)}">
-          <span class="svc ${cls}">${escapeHtml(s.name)}: ${escapeHtml(s.state)}</span>
-          ${runBtn}${restartBtn}${bootBtn}
+        const ver = lastVersions[s.name];
+        const canUpdate = !!(ver && ver.present && ver.git);
+        const updateLine =
+          canUpdate && ver.behind != null && ver.behind > 0
+            ? `<div class="svc-update-avail">Update available.</div>`
+            : '';
+        const gear = canUpdate
+          ? `<button type="button" class="svc-gear" data-update="${escapeHtml(s.name)}" title="Update ${escapeHtml(s.name)}" ${dis} aria-label="Update ${escapeHtml(s.name)}">⚙</button>`
+          : '';
+        return `<div class="svc-row${canUpdate ? ' has-gear' : ''}" data-name="${escapeHtml(s.name)}">
+          <div class="svc-top">
+            <span class="svc ${cls}">${escapeHtml(s.name)}: ${escapeHtml(s.state)}</span>
+            ${runBtn}${restartBtn}${bootBtn}
+          </div>
           <span class="svc-meta">${escapeHtml(s.tier)} · boot ${escapeHtml(en)}${s.pid ? ` · pid ${s.pid}` : ''}${self ? ' · (self)' : ''}</span>
+          ${updateLine}
+          ${gear}
         </div>`;
       }).join('');
+    }
+
+    function setUpdateStatus(msg, isErr) {
+      const el = document.getElementById('update-status');
+      el.textContent = msg || '';
+      el.classList.toggle('err', !!isErr);
+    }
+
+    function syncUpdateApplyEnabled() {
+      const btn = document.getElementById('update-apply');
+      if (!updateCtx || updateInProgress) {
+        btn.disabled = true;
+        return;
+      }
+      const branch = document.getElementById('update-branch').value;
+      const sha = document.getElementById('update-commit').value;
+      const changed =
+        !!branch &&
+        !!sha &&
+        (branch !== (updateCtx.branch || '') || sha !== (updateCtx.headSha || ''));
+      btn.disabled = !changed;
+    }
+
+    function fillCommitSelect() {
+      const sel = document.getElementById('update-commit');
+      const branch = document.getElementById('update-branch').value;
+      sel.innerHTML = '';
+      if (!updateCommitData) {
+        sel.innerHTML = '<option value="">No commits</option>';
+        syncUpdateApplyEnabled();
+        return;
+      }
+      const opts = shapeCommitSelectOptions(updateCommitData, branch);
+      if (!opts.length) {
+        sel.innerHTML = '<option value="">No commits</option>';
+        syncUpdateApplyEnabled();
+        return;
+      }
+      let selected = '';
+      for (const o of opts) {
+        if (o.kind === 'gap') {
+          const opt = document.createElement('option');
+          opt.disabled = true;
+          opt.value = '';
+          opt.textContent = `${o.more} more recent commits`;
+          sel.appendChild(opt);
+          continue;
+        }
+        const opt = document.createElement('option');
+        opt.value = o.commit.sha;
+        const when = o.commit.date ? o.commit.date.slice(0, 10) : '';
+        opt.textContent = `${o.commit.short} — ${o.commit.subject}${when ? ` (${when})` : ''}`;
+        if (o.current) {
+          opt.className = 'current-opt';
+          opt.style.fontWeight = '700';
+        }
+        if (o.current || (!selected && o.commit.sha === updateCtx?.headSha)) {
+          selected = o.commit.sha;
+        }
+        sel.appendChild(opt);
+      }
+      if (selected) sel.value = selected;
+      else if (sel.options.length) sel.selectedIndex = 0;
+      syncUpdateApplyEnabled();
+    }
+
+    async function loadUpdateCommits(branch) {
+      if (!updateCtx) return;
+      setUpdateStatus('Loading commits…');
+      try {
+        const { res, data } = await fetchJson(
+          `/apps/${encodeURIComponent(updateCtx.name)}/commits?branch=${encodeURIComponent(branch)}`,
+        );
+        if (!res.ok) throw new Error(data?.message || 'Failed to load commits');
+        updateCommitData = data;
+        if (data.originUrl) {
+          document.getElementById('update-origin').textContent = data.originUrl;
+          updateCtx.originUrl = data.originUrl;
+        }
+        if (data.error) setUpdateStatus(data.error, true);
+        else setUpdateStatus('');
+        fillCommitSelect();
+      } catch (e) {
+        updateCommitData = null;
+        fillCommitSelect();
+        setUpdateStatus(e.message || String(e), true);
+      }
+    }
+
+    async function openUpdateModal(name) {
+      const ver = lastVersions[name];
+      if (!ver || !ver.git) return;
+      if (!(await ensureAuth())) return;
+      updateCtx = {
+        name,
+        path: ver.path,
+        originUrl: ver.originUrl || null,
+        branch: ver.branch || null,
+        headSha: ver.head?.sha || null,
+        originBranches: ver.originBranches || [],
+      };
+      updateCommitData = null;
+      document.getElementById('update-title').textContent = appDisplayName(ver);
+      document.getElementById('update-origin').textContent =
+        ver.originUrl || ver.path || '';
+      const branchSel = document.getElementById('update-branch');
+      branchSel.innerHTML = '';
+      const branches = [...(ver.originBranches || [])];
+      if (ver.branch && !branches.includes(ver.branch)) branches.unshift(ver.branch);
+      for (const b of branches) {
+        const opt = document.createElement('option');
+        opt.value = b;
+        opt.textContent = b;
+        if (b === ver.branch) {
+          opt.className = 'current-opt';
+          opt.style.fontWeight = '700';
+        }
+        branchSel.appendChild(opt);
+      }
+      if (ver.branch) branchSel.value = ver.branch;
+      document.getElementById('update-apply').disabled = true;
+      document.getElementById('update-cancel').disabled = false;
+      branchSel.disabled = false;
+      document.getElementById('update-commit').disabled = false;
+      setUpdateStatus('');
+      document.getElementById('update-dialog').showModal();
+      await loadUpdateCommits(branchSel.value);
+    }
+
+    function confirmLeaveUpdate() {
+      return new Promise((resolve) => {
+        const dlg = document.getElementById('update-leave-dialog');
+        const onContinue = () => {
+          cleanup();
+          resolve(false);
+        };
+        const onAbort = () => {
+          cleanup();
+          resolve(true);
+        };
+        function cleanup() {
+          document.getElementById('update-leave-continue').removeEventListener('click', onContinue);
+          document.getElementById('update-leave-abort').removeEventListener('click', onAbort);
+          dlg.close();
+        }
+        document.getElementById('update-leave-continue').addEventListener('click', onContinue);
+        document.getElementById('update-leave-abort').addEventListener('click', onAbort);
+        dlg.showModal();
+      });
+    }
+
+    function setUpdateInProgress(on) {
+      updateInProgress = on;
+      document.getElementById('update-branch').disabled = on;
+      document.getElementById('update-commit').disabled = on;
+      document.getElementById('update-cancel').disabled = on;
+      if (on) document.getElementById('update-apply').disabled = true;
+      else syncUpdateApplyEnabled();
+      renderServices({ services: lastServices });
+    }
+
+    async function applyAppUpdate() {
+      if (!updateCtx || updateInProgress) return;
+      const branch = document.getElementById('update-branch').value;
+      const sha = document.getElementById('update-commit').value;
+      if (!branch || !sha) return;
+      if (!(await ensureAuth())) return;
+      updateAbort = new AbortController();
+      setUpdateInProgress(true);
+      setUpdateStatus('Applying update…');
+      showActivity('start', `Updating ${updateCtx.name}…`);
+      try {
+        const { res, data } = await fetchJson('/actions/app-update', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: updateCtx.name,
+            branch,
+            sha,
+            confirm: true,
+          }),
+          signal: updateAbort.signal,
+        });
+        if (!res.ok || !data?.ok) {
+          throw new Error(data?.message || 'Update failed');
+        }
+        setUpdateStatus(data.message || 'Update complete');
+        showActivity('done', data.message || 'Update complete');
+        document.getElementById('update-dialog').close();
+        updateCtx = null;
+        await loadVersions();
+        const { data: svc } = await fetchJson('/services');
+        if (svc) renderServices(svc);
+      } catch (e) {
+        if (e?.name === 'AbortError') {
+          setUpdateStatus(
+            'Client cancelled waiting — server may still finish the update.',
+            true,
+          );
+          showActivity('error', 'Update wait cancelled (not advised)');
+        } else {
+          setUpdateStatus(e.message || String(e), true);
+          showActivity('error', e.message || 'Update failed');
+        }
+      } finally {
+        updateAbort = null;
+        setUpdateInProgress(false);
+      }
+    }
+
+    async function loadVersions() {
+      versionsLoading = true;
+      renderServices({ services: lastServices });
+      try {
+        const { res, data } = await fetchJson('/apps/versions');
+        if (!res.ok) throw new Error(data?.message || 'versions failed');
+        const map = {};
+        for (const a of data.apps || []) map[a.name] = a;
+        lastVersions = map;
+      } catch (e) {
+        console.warn('[pxh] app versions', e);
+      } finally {
+        versionsLoading = false;
+        renderServices({ services: lastServices });
+      }
     }
 
     async function serviceAction(name, action) {
@@ -635,7 +1008,10 @@
     }
 
     document.getElementById('btn-theme').onclick = cycleTheme;
-    document.getElementById('btn-refresh').onclick = () => pollOnce();
+    document.getElementById('btn-refresh').onclick = () => {
+      void pollOnce();
+      void loadVersions();
+    };
     document.getElementById('btn-login').onclick = () => ensureAuth();
     document.getElementById('btn-logout').onclick = async () => {
       await fetchJson('/auth/logout', { method: 'POST' });
@@ -664,11 +1040,39 @@
     };
 
     document.getElementById('services').addEventListener('click', (ev) => {
+      const gear = ev.target.closest('button[data-update]');
+      if (gear) {
+        if (gear.disabled) return;
+        void openUpdateModal(gear.dataset.update);
+        return;
+      }
       const btn = ev.target.closest('button[data-act]');
       if (!btn || btn.disabled) return;
       const row = btn.closest('.svc-row');
       if (!row) return;
       void serviceAction(row.dataset.name, btn.dataset.act);
+    });
+
+    document.getElementById('update-branch').addEventListener('change', () => {
+      void loadUpdateCommits(document.getElementById('update-branch').value);
+    });
+    document.getElementById('update-commit').addEventListener('change', syncUpdateApplyEnabled);
+    document.getElementById('update-apply').onclick = () => { void applyAppUpdate(); };
+    document.getElementById('update-cancel').onclick = () => {
+      if (updateInProgress) return;
+      document.getElementById('update-dialog').close();
+    };
+    document.getElementById('update-dialog').addEventListener('cancel', (ev) => {
+      if (!updateInProgress) return;
+      ev.preventDefault();
+      void confirmLeaveUpdate().then((abort) => {
+        if (abort && updateAbort) updateAbort.abort();
+      });
+    });
+    window.addEventListener('beforeunload', (ev) => {
+      if (!updateInProgress) return;
+      ev.preventDefault();
+      ev.returnValue = '';
     });
 
     document.getElementById('btn-upgrade').onclick = async () => {
@@ -733,8 +1137,9 @@
       await refreshSession();
       await checkNginxBanner();
       connectWs();
-      // bootstrap panels via HTTP once
+      // bootstrap panels via HTTP once; git versions only on load / Refresh
       await pollOnce();
+      void loadVersions();
     })();
   </script>
 </body>

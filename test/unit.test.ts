@@ -1,17 +1,29 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
+import { writeFileSync, unlinkSync, mkdirSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import {
   loadConfig,
   topicMatches,
   matchWarningColor,
 } from '../src/config/loadConfig.js';
 import { diskLevel } from '../src/metrics/collector.js';
-import { mqttSystemTopic, mqttSystemPrefix } from '../src/types.js';
+import {
+  mqttSystemTopic,
+  mqttSystemPrefix,
+  DEFAULT_APP_PATHS,
+} from '../src/types.js';
+import {
+  getAppVersions,
+  mappedAppEntries,
+  shapeCommitSelectOptions,
+} from '../src/runtime/appVersions.js';
+import { runAppUpdate } from '../src/actions/appUpdate.js';
 import { RingBuffer } from '../src/panels/ringBuffer.js';
 import { encodeSession, decodeSession } from '../src/auth/session.js';
+import type { AppCommitInfo, PxhConfig } from '../src/types.js';
 
 describe('topicMatches', () => {
   it('matches + and exact segments', () => {
@@ -115,7 +127,286 @@ rule.1.color = pfx
     assert.deepEqual(cfg.services.user, ['custom-unit']);
     assert.equal(cfg.warnings.rules[0].color, 'pfx');
     assert.equal(cfg.server.host, '0.0.0.0');
+    assert.equal(cfg.apps['paradox-health'], DEFAULT_APP_PATHS['paradox-health']);
+    assert.equal(cfg.apps.pxo, DEFAULT_APP_PATHS.pxo);
     unlinkSync(path);
+  });
+
+  it('overlays [apps] paths and allows clearing a default', () => {
+    const dir = resolve(tmpdir(), `pxh-apps-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    const path = resolve(dir, 'pxh.ini');
+    writeFileSync(
+      path,
+      `[machine]
+id = t
+[apps]
+pxo = /custom/PxO
+pfx =
+`,
+    );
+    const cfg = loadConfig(path);
+    assert.equal(cfg.apps.pxo, '/custom/PxO');
+    assert.equal(cfg.apps.pfx, undefined);
+    assert.equal(cfg.apps['paradox-health'], DEFAULT_APP_PATHS['paradox-health']);
+    assert.equal(cfg.actions.allowAppUpdate, true);
+    unlinkSync(path);
+  });
+
+  it('honors allow_app_update = false', () => {
+    const dir = resolve(tmpdir(), `pxh-allow-${Date.now()}`);
+    mkdirSync(dir, { recursive: true });
+    const path = resolve(dir, 'pxh.ini');
+    writeFileSync(
+      path,
+      `[machine]
+id = t
+[actions]
+allow_app_update = false
+`,
+    );
+    const cfg = loadConfig(path);
+    assert.equal(cfg.actions.allowAppUpdate, false);
+    unlinkSync(path);
+  });
+});
+
+describe('appVersions', () => {
+  it('maps only allowlisted service units', () => {
+    const cfg = {
+      services: {
+        required: ['pxo', 'nginx'],
+        optional: ['paradox-health'],
+        user: [],
+      },
+      apps: {
+        pxo: '/opt/paradox/apps/PxO',
+        'paradox-health': '/opt/paradox/apps/PxH',
+        // In apps map but not in services allowlist → excluded
+        pxb: '/opt/paradox/apps/PxB',
+      },
+    } as Parameters<typeof mappedAppEntries>[0];
+    const entries = mappedAppEntries(cfg);
+    assert.deepEqual(
+      entries.map((e) => e.name),
+      ['paradox-health', 'pxo'],
+    );
+  });
+
+  it('reports behind commits against a local origin', () => {
+    const root = resolve(tmpdir(), `pxh-git-${Date.now()}`);
+    const bare = resolve(root, 'origin.git');
+    const work = resolve(root, 'work');
+    mkdirSync(root, { recursive: true });
+    execFileSync('git', ['init', '--bare', bare], { stdio: 'ignore' });
+    execFileSync('git', ['clone', bare, work], { stdio: 'ignore' });
+    const git = (args: string[], cwd = work) =>
+      execFileSync('git', ['-C', cwd, ...args], {
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Test',
+          GIT_AUTHOR_EMAIL: 't@example.com',
+          GIT_COMMITTER_NAME: 'Test',
+          GIT_COMMITTER_EMAIL: 't@example.com',
+        },
+      });
+    writeFileSync(resolve(work, 'a.txt'), 'one\n');
+    git(['add', 'a.txt']);
+    git(['commit', '-m', 'first']);
+    git(['branch', '-M', 'main']);
+    git(['push', '-u', 'origin', 'main']);
+    execFileSync('git', ['-C', bare, 'symbolic-ref', 'HEAD', 'refs/heads/main'], {
+      stdio: 'ignore',
+    });
+
+    // Advance origin with two commits via a second clone
+    const other = resolve(root, 'other');
+    execFileSync('git', ['clone', '-b', 'main', bare, other], { stdio: 'ignore' });
+    const gitOther = (args: string[]) =>
+      execFileSync('git', ['-C', other, ...args], {
+        stdio: 'ignore',
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: 'Test',
+          GIT_AUTHOR_EMAIL: 't@example.com',
+          GIT_COMMITTER_NAME: 'Test',
+          GIT_COMMITTER_EMAIL: 't@example.com',
+        },
+      });
+    writeFileSync(resolve(other, 'b.txt'), 'two\n');
+    gitOther(['add', 'b.txt']);
+    gitOther(['commit', '-m', 'second newer']);
+    writeFileSync(resolve(other, 'c.txt'), 'three\n');
+    gitOther(['add', 'c.txt']);
+    gitOther(['commit', '-m', 'third newer']);
+    gitOther(['push', 'origin', 'main']);
+
+    const cfg = {
+      services: { required: ['demo'], optional: [], user: [] },
+      apps: { demo: work },
+    } as Parameters<typeof getAppVersions>[0];
+
+    return getAppVersions(cfg).then((apps) => {
+      assert.equal(apps.length, 1);
+      const a = apps[0];
+      assert.equal(a.name, 'demo');
+      assert.equal(a.git, true);
+      assert.equal(a.branch, 'main');
+      assert.equal(a.behind, 2);
+      assert.equal(a.ahead, 0);
+      assert.ok(a.originUrl);
+      assert.ok(a.originBranches.includes('main'));
+      assert.equal(a.newerCommits.length, 2);
+      assert.equal(a.newerCommits[0].subject, 'third newer');
+      assert.equal(a.newerCommits[1].subject, 'second newer');
+      rmSync(root, { recursive: true, force: true });
+    });
+  });
+
+  it('shapes commit select with gap when behind > 4', () => {
+    const mk = (n: number): AppCommitInfo => ({
+      sha: `sha${n}`,
+      short: `s${n}`,
+      subject: `c${n}`,
+      body: '',
+      author: 't',
+      date: '2026-07-21T00:00:00Z',
+    });
+    const commits = [6, 5, 4, 3, 2, 1, 0].map(mk);
+    const head = mk(0);
+    const opts = shapeCommitSelectOptions({
+      commits,
+      head,
+      headSha: head.sha,
+      behind: 6,
+      selectedBranch: 'main',
+      currentBranch: 'main',
+    });
+    assert.equal(opts.length, 6); // 4 + gap + current
+    assert.equal(opts[0].kind, 'commit');
+    assert.equal(opts[3].kind, 'commit');
+    assert.equal(opts[4].kind, 'gap');
+    if (opts[4].kind === 'gap') assert.equal(opts[4].more, 2);
+    assert.equal(opts[5].kind, 'commit');
+    if (opts[5].kind === 'commit') {
+      assert.equal(opts[5].current, true);
+      assert.equal(opts[5].commit.sha, 'sha0');
+    }
+  });
+
+  it('shapes commit select as last 5 when not far behind', () => {
+    const mk = (n: number): AppCommitInfo => ({
+      sha: `sha${n}`,
+      short: `s${n}`,
+      subject: `c${n}`,
+      body: '',
+      author: 't',
+      date: '2026-07-21T00:00:00Z',
+    });
+    const commits = [4, 3, 2, 1, 0].map(mk);
+    const opts = shapeCommitSelectOptions({
+      commits,
+      head: mk(0),
+      headSha: 'sha0',
+      behind: 4,
+      selectedBranch: 'main',
+      currentBranch: 'main',
+    });
+    assert.equal(opts.length, 5);
+    assert.ok(opts.every((o) => o.kind === 'commit'));
+    assert.equal(opts[4].kind, 'commit');
+    if (opts[4].kind === 'commit') assert.equal(opts[4].current, true);
+  });
+});
+
+describe('appUpdate', () => {
+  function makeCfg(work: string): PxhConfig {
+    return {
+      actions: {
+        enabled: true,
+        allowAppUpdate: true,
+        allowUpgrade: true,
+        allowReboot: true,
+        allowService: true,
+        allowCleanup: true,
+        allowPruneIde: true,
+        sessionHours: 1,
+        allowedUsers: [],
+        sessionSecret: 'test',
+      },
+      services: { required: ['demo'], optional: [], user: [] },
+      apps: { demo: work },
+    } as PxhConfig;
+  }
+
+  it('refuses dirty working tree', async () => {
+    const root = resolve(tmpdir(), `pxh-dirty-${Date.now()}`);
+    const bare = resolve(root, 'origin.git');
+    const work = resolve(root, 'work');
+    mkdirSync(root, { recursive: true });
+    execFileSync('git', ['init', '--bare', bare], { stdio: 'ignore' });
+    execFileSync('git', ['clone', bare, work], { stdio: 'ignore' });
+    const env = {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'Test',
+      GIT_AUTHOR_EMAIL: 't@example.com',
+      GIT_COMMITTER_NAME: 'Test',
+      GIT_COMMITTER_EMAIL: 't@example.com',
+    };
+    writeFileSync(resolve(work, 'a.txt'), 'one\n');
+    execFileSync('git', ['-C', work, 'add', 'a.txt'], { stdio: 'ignore', env });
+    execFileSync('git', ['-C', work, 'commit', '-m', 'first'], { stdio: 'ignore', env });
+    execFileSync('git', ['-C', work, 'branch', '-M', 'main'], { stdio: 'ignore', env });
+    execFileSync('git', ['-C', work, 'push', '-u', 'origin', 'main'], { stdio: 'ignore', env });
+    writeFileSync(resolve(work, 'a.txt'), 'dirty\n');
+
+    const sha = execFileSync('git', ['-C', work, 'rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+    }).trim();
+    const result = await runAppUpdate(makeCfg(work), 'demo', 'main', sha, true);
+    assert.equal(result.ok, false);
+    assert.match(result.message, /dirty/i);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('refuses sha not on origin branch', async () => {
+    const root = resolve(tmpdir(), `pxh-sha-${Date.now()}`);
+    const bare = resolve(root, 'origin.git');
+    const work = resolve(root, 'work');
+    mkdirSync(root, { recursive: true });
+    execFileSync('git', ['init', '--bare', bare], { stdio: 'ignore' });
+    execFileSync('git', ['clone', bare, work], { stdio: 'ignore' });
+    const env = {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'Test',
+      GIT_AUTHOR_EMAIL: 't@example.com',
+      GIT_COMMITTER_NAME: 'Test',
+      GIT_COMMITTER_EMAIL: 't@example.com',
+    };
+    writeFileSync(resolve(work, 'a.txt'), 'one\n');
+    execFileSync('git', ['-C', work, 'add', 'a.txt'], { stdio: 'ignore', env });
+    execFileSync('git', ['-C', work, 'commit', '-m', 'first'], { stdio: 'ignore', env });
+    execFileSync('git', ['-C', work, 'branch', '-M', 'main'], { stdio: 'ignore', env });
+    execFileSync('git', ['-C', work, 'push', '-u', 'origin', 'main'], { stdio: 'ignore', env });
+
+    // Orphan commit not pushed / not on origin/main
+    execFileSync('git', ['-C', work, 'checkout', '--orphan', 'orphan'], {
+      stdio: 'ignore',
+      env,
+    });
+    writeFileSync(resolve(work, 'o.txt'), 'orphan\n');
+    execFileSync('git', ['-C', work, 'add', 'o.txt'], { stdio: 'ignore', env });
+    execFileSync('git', ['-C', work, 'commit', '-m', 'orphan'], { stdio: 'ignore', env });
+    const orphanSha = execFileSync('git', ['-C', work, 'rev-parse', 'HEAD'], {
+      encoding: 'utf8',
+    }).trim();
+    execFileSync('git', ['-C', work, 'checkout', 'main'], { stdio: 'ignore', env });
+
+    const result = await runAppUpdate(makeCfg(work), 'demo', 'main', orphanSha, true);
+    assert.equal(result.ok, false);
+    assert.match(result.message, /not on origin/i);
+    rmSync(root, { recursive: true, force: true });
   });
 });
 

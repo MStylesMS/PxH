@@ -83,6 +83,7 @@ limits, auth, prune. Full sample: [config/pxh.example.ini](../config/pxh.example
 | `[machine]` | `id` (MQTT `<id>`), display hostname |
 | `[thresholds]` | disk warn/critical % and free-GB floors |
 | `[services]` | required / optional / user-defined systemd units to probe |
+| `[apps]` | unit → absolute path for Paradox app git checkouts (version inventory) |
 | `[mqtt]` | broker, `topic_root` (default `paradox`), optional `topic_base` override, interval |
 | `[warnings]` | topic patterns, colors, history limits → **System Warnings** panel |
 | `[journal]` | enable, unit filters, history, severity colors |
@@ -156,6 +157,21 @@ never touch `/opt/paradox` media/apps/configs.
 **UI controls (session required):** contextual Start/Stop, Restart, and Enable/Disable.
 Stop/Disable of `paradox-health` itself is refused (would take down the UI).
 
+### 7.1 Paradox app versions & updates (Phases 1–2)
+
+Mapped units in `[apps]` (default paths under `/opt/paradox/apps/…`) are real git checkouts
+with `origin` (SSH keys already on the host). On UI load / Refresh (not the periodic services
+poll), PxH runs `git fetch` and reports behind/HEAD for the Services grid.
+
+**Card:** `Update available.` when behind; gear opens an update modal (PAM session for Apply).
+
+**Apply:** `git fetch` → checkout branch → `git reset --hard <sha>` → `systemctl restart`
+(including self-update of `paradox-health`). Refuses a dirty working tree. Commit SHAs must
+be ancestors of `origin/<branch>`. Gated by `[actions] allow_app_update`.
+
+Infra units (`mosquitto`, `nginx`) stay systemd-only. See
+[pending/13-app-versions-and-updates.md](pending/13-app-versions-and-updates.md).
+
 ---
 
 ## 8. How the UI is served (nginx vs self)
@@ -177,7 +193,8 @@ Stop/Disable of `paradox-health` itself is refused (would take down the UI).
 ### 9.1 Metrics cards
 
 Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, plus a **Services** grid
-(same ~⅓ width cards as the warning panels) with contextual unit controls.
+(same ~⅓ width cards as the warning panels) with contextual unit controls and, for Paradox
+apps in `[apps]`, an update gear / “Update available.” modal for branch/commit checkout.
 
 ### 9.2 System Warnings (MQTT)
 

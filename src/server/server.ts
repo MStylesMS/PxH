@@ -13,12 +13,17 @@ import { APP_VERSION } from '../types.js';
 import { collectMetrics } from '../metrics/collector.js';
 import { getRuntimeServices } from '../runtime/services.js';
 import {
+  getAppBranchCommits,
+  getAppVersions,
+} from '../runtime/appVersions.js';
+import {
   runUpgrade,
   runReboot,
   runServiceAction,
   runCleanup,
   runPruneIdeAction,
 } from '../actions/actions.js';
+import { runAppUpdate } from '../actions/appUpdate.js';
 import { pamAuthenticate } from '../auth/pam.js';
 import {
   clearSessionCookie,
@@ -129,6 +134,26 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
   app.get('/runtime', async () => ({
     services: await getRuntimeServices(cfg),
   }));
+
+  /** Git version inventory for Paradox apps (fetch on demand — not WS). */
+  app.get('/apps/versions', async () => ({
+    apps: await getAppVersions(cfg),
+  }));
+
+  /** Recent commits on origin/<branch> for the update modal. */
+  app.get<{ Params: { name: string }; Querystring: { branch?: string } }>(
+    '/apps/:name/commits',
+    async (req, reply) => {
+      const branch = String(req.query?.branch || '').trim();
+      if (!branch) {
+        return reply.code(400).send({
+          ok: false,
+          message: 'branch query parameter required',
+        });
+      }
+      return getAppBranchCommits(cfg, req.params.name, branch);
+    },
+  );
 
   /** Server-side probe of nginx /health/ (avoids browser cross-origin from :19090). */
   app.get('/reachability/nginx-health', async () => {
@@ -392,6 +417,37 @@ export async function createServer(cfg: PxhConfig, deps: ServerDeps) {
       name: 'prune-ide',
       message: result.message,
     });
+    return reply.code(result.ok ? 200 : 400).send(result);
+  });
+
+  app.post<{
+    Body: { name?: string; branch?: string; sha?: string; confirm?: boolean };
+  }>('/actions/app-update', async (req, reply) => {
+    if (!requireSession(req, reply, cfg)) return;
+    const name = String(req.body?.name || '').trim();
+    const branch = String(req.body?.branch || '').trim();
+    const sha = String(req.body?.sha || '').trim();
+    broadcastAction({
+      phase: 'start',
+      name: 'app-update',
+      message: `Updating ${name || 'app'}…`,
+    });
+    const result = await runAppUpdate(
+      cfg,
+      name,
+      branch,
+      sha,
+      Boolean(req.body?.confirm),
+      (step) => broadcastAction({ phase: 'progress', name: 'app-update', message: step }),
+    );
+    broadcastAction({
+      phase: result.ok ? 'done' : 'error',
+      name: 'app-update',
+      message: result.message,
+    });
+    if (result.ok) {
+      broadcast('services', { services: await getRuntimeServices(cfg) });
+    }
     return reply.code(result.ok ? 200 : 400).send(result);
   });
 
