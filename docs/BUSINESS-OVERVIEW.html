@@ -33,7 +33,8 @@
     <p class="sub">Last updated 2026-07-22. Canonical file:
       <code>docs/BUSINESS-OVERVIEW.html</code> (no separate <code>.md</code>).
       Since baseline <code>563a1ef</code>: UPS telemetry (plan 14), app git versions (plan 13, phases 1–2),
-      process conflict badges, detached OS upgrade; plan 06 MQTT hygiene completed same day.
+      process conflict badges, detached OS upgrade; plan 06 MQTT hygiene completed same day;
+      update modal always shows machine HEAD (bold / preselected).
       Links relative to <code>apps/PxH/docs/</code>.</p>
   </header>
   <main>
@@ -107,7 +108,9 @@
 
     <h3>Paradox app versions &amp; updates <span class="status partial">Partial</span></h3>
     <p class="verdict"><strong>Shipped (phases 1–2):</strong> Services grid versions, update modal,
-      hard reset + restart. <strong>Remaining:</strong> Node (3), rooms repos (4).
+      hard reset + restart. Modal always lists machine HEAD (bold, preselected); Apply is a no-op
+      when that commit is selected; other branches do not force-append HEAD.
+      <strong>Remaining:</strong> Node (3), rooms repos (4).
       Plan: <a href="pending/13-app-versions-and-updates.md">13</a>.</p>
 
     <h3>nginx vs own server <span class="status done">Done</span></h3>

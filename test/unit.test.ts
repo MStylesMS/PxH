@@ -440,17 +440,20 @@ describe('appVersions', () => {
     });
   });
 
-  it('shapes commit select with gap when behind > 4', () => {
-    const mk = (n: number): AppCommitInfo => ({
+  function mkCommit(n: number): AppCommitInfo {
+    return {
       sha: `sha${n}`,
       short: `s${n}`,
       subject: `c${n}`,
       body: '',
       author: 't',
       date: '2026-07-21T00:00:00Z',
-    });
-    const commits = [6, 5, 4, 3, 2, 1, 0].map(mk);
-    const head = mk(0);
+    };
+  }
+
+  it('shapes commit select with gap when HEAD is outside newest window', () => {
+    const commits = [6, 5, 4, 3, 2, 1, 0].map(mkCommit);
+    const head = mkCommit(0);
     const opts = shapeCommitSelectOptions({
       commits,
       head,
@@ -471,28 +474,84 @@ describe('appVersions', () => {
     }
   });
 
-  it('shapes commit select as last 5 when not far behind', () => {
-    const mk = (n: number): AppCommitInfo => ({
-      sha: `sha${n}`,
-      short: `s${n}`,
-      subject: `c${n}`,
-      body: '',
-      author: 't',
-      date: '2026-07-21T00:00:00Z',
-    });
-    const commits = [4, 3, 2, 1, 0].map(mk);
+  it('shapes commit select as last 5 with HEAD bold when behind === 2', () => {
+    const commits = [4, 3, 2, 1, 0].map(mkCommit);
     const opts = shapeCommitSelectOptions({
       commits,
-      head: mk(0),
-      headSha: 'sha0',
-      behind: 4,
+      head: mkCommit(2),
+      headSha: 'sha2',
+      behind: 2,
       selectedBranch: 'main',
       currentBranch: 'main',
     });
     assert.equal(opts.length, 5);
     assert.ok(opts.every((o) => o.kind === 'commit'));
-    assert.equal(opts[4].kind, 'commit');
-    if (opts[4].kind === 'commit') assert.equal(opts[4].current, true);
+    assert.equal(opts[0].kind, 'commit');
+    if (opts[0].kind === 'commit') {
+      assert.equal(opts[0].commit.sha, 'sha4');
+      assert.equal(opts[0].current, false);
+    }
+    assert.equal(opts[2].kind, 'commit');
+    if (opts[2].kind === 'commit') {
+      assert.equal(opts[2].commit.sha, 'sha2');
+      assert.equal(opts[2].current, true);
+    }
+  });
+
+  it('shapes commit select as last 5 when HEAD is tip', () => {
+    const commits = [4, 3, 2, 1, 0].map(mkCommit);
+    const opts = shapeCommitSelectOptions({
+      commits,
+      head: mkCommit(4),
+      headSha: 'sha4',
+      behind: 0,
+      selectedBranch: 'main',
+      currentBranch: 'main',
+    });
+    assert.equal(opts.length, 5);
+    assert.ok(opts.every((o) => o.kind === 'commit'));
+    assert.equal(opts[0].kind, 'commit');
+    if (opts[0].kind === 'commit') {
+      assert.equal(opts[0].current, true);
+      assert.equal(opts[0].commit.sha, 'sha4');
+    }
+  });
+
+  it('appends HEAD when missing from origin window on current branch', () => {
+    const commits = [4, 3, 2, 1, 0].map(mkCommit);
+    const head = mkCommit(99);
+    const opts = shapeCommitSelectOptions({
+      commits,
+      head,
+      headSha: head.sha,
+      behind: 0,
+      selectedBranch: 'main',
+      currentBranch: 'main',
+    });
+    assert.equal(opts.length, 6); // 4 + gap + current
+    assert.equal(opts[4].kind, 'gap');
+    if (opts[4].kind === 'gap') assert.equal(opts[4].more, 1);
+    assert.equal(opts[5].kind, 'commit');
+    if (opts[5].kind === 'commit') {
+      assert.equal(opts[5].current, true);
+      assert.equal(opts[5].commit.sha, 'sha99');
+    }
+  });
+
+  it('does not force-append HEAD when viewing another branch', () => {
+    const commits = [4, 3, 2, 1, 0].map(mkCommit);
+    const head = mkCommit(99);
+    const opts = shapeCommitSelectOptions({
+      commits,
+      head,
+      headSha: head.sha,
+      behind: 0,
+      selectedBranch: 'develop',
+      currentBranch: 'main',
+    });
+    assert.equal(opts.length, 5);
+    assert.ok(opts.every((o) => o.kind === 'commit'));
+    assert.ok(opts.every((o) => o.kind !== 'commit' || o.current === false));
   });
 });
 

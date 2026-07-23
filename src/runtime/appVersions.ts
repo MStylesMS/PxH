@@ -124,10 +124,15 @@ async function readCurrentBranch(cwd: string): Promise<string | null> {
   }
 }
 
+function commitMatchesSha(c: AppCommitInfo, headKey: string): boolean {
+  return c.sha === headKey || c.sha.startsWith(headKey) || headKey.startsWith(c.sha);
+}
+
 /**
  * Shape the update-modal commit dropdown.
- * - Default: up to 5 newest on origin/<branch>, current HEAD bold when present.
- * - If viewing the current branch and behind > 4: 4 newest, gap line, then current HEAD.
+ * - Up to 5 newest on origin/<branch>; machine HEAD bold when present in that window.
+ * - On the current branch, if HEAD is not in that window: 4 newest, gap, then HEAD (bold).
+ * - Other branches: do not force-append machine HEAD.
  */
 export function shapeCommitSelectOptions(args: {
   commits: AppCommitInfo[];
@@ -139,20 +144,33 @@ export function shapeCommitSelectOptions(args: {
 }): CommitSelectOption[] {
   const { commits, head, headSha, behind, selectedBranch, currentBranch } = args;
   const headKey = headSha || head?.sha || null;
-  const onCurrent =
-    currentBranch != null &&
-    selectedBranch === currentBranch &&
-    behind != null &&
-    behind > 4 &&
-    headKey;
+  const window = commits.slice(0, 5);
+  const headInWindow =
+    !!headKey && window.some((c) => commitMatchesSha(c, headKey));
 
-  if (onCurrent) {
+  if (headInWindow) {
+    return window.map((c) => ({
+      kind: 'commit' as const,
+      commit: c,
+      current: !!headKey && commitMatchesSha(c, headKey),
+    }));
+  }
+
+  const onCurrentBranch =
+    !!headKey && currentBranch != null && selectedBranch === currentBranch;
+
+  if (onCurrentBranch) {
     const top = commits.slice(0, 4);
-    const more = behind! - 4;
+    const headIdx = commits.findIndex((c) => commitMatchesSha(c, headKey));
+    const more =
+      headIdx >= 4
+        ? headIdx - 4
+        : behind != null && behind > 4
+          ? behind - 4
+          : 1;
     const current =
       head ||
-      commits.find((c) => c.sha === headKey || c.sha.startsWith(headKey!)) ||
-      null;
+      (headIdx >= 0 ? commits[headIdx]! : null);
     const out: CommitSelectOption[] = top.map((c) => ({
       kind: 'commit' as const,
       commit: c,
@@ -165,10 +183,10 @@ export function shapeCommitSelectOptions(args: {
     return out;
   }
 
-  return commits.slice(0, 5).map((c) => ({
+  return window.map((c) => ({
     kind: 'commit' as const,
     commit: c,
-    current: !!headKey && (c.sha === headKey || c.sha.startsWith(headKey)),
+    current: !!headKey && commitMatchesSha(c, headKey),
   }));
 }
 

@@ -598,34 +598,46 @@
     }
 
     /** Mirror server shapeCommitSelectOptions for the modal dropdown. */
+    function commitMatchesSha(c, headKey) {
+      return c.sha === headKey || c.sha.startsWith(headKey) || headKey.startsWith(c.sha);
+    }
     function shapeCommitSelectOptions(data, selectedBranch) {
       const commits = data.commits || [];
       const head = data.head || null;
       const headSha = data.headSha || head?.sha || null;
       const behind = data.behind;
       const currentBranch = data.currentBranch;
-      const onCurrent =
-        currentBranch != null &&
-        selectedBranch === currentBranch &&
-        behind != null &&
-        behind > 4 &&
-        headSha;
-      if (onCurrent) {
+      const window = commits.slice(0, 5);
+      const headInWindow =
+        !!headSha && window.some((c) => commitMatchesSha(c, headSha));
+      if (headInWindow) {
+        return window.map((c) => ({
+          kind: 'commit',
+          commit: c,
+          current: !!headSha && commitMatchesSha(c, headSha),
+        }));
+      }
+      const onCurrentBranch =
+        !!headSha && currentBranch != null && selectedBranch === currentBranch;
+      if (onCurrentBranch) {
         const top = commits.slice(0, 4);
-        const more = behind - 4;
-        const current =
-          head ||
-          commits.find((c) => c.sha === headSha || c.sha.startsWith(headSha)) ||
-          null;
+        const headIdx = commits.findIndex((c) => commitMatchesSha(c, headSha));
+        const more =
+          headIdx >= 4
+            ? headIdx - 4
+            : behind != null && behind > 4
+              ? behind - 4
+              : 1;
+        const current = head || (headIdx >= 0 ? commits[headIdx] : null);
         const out = top.map((c) => ({ kind: 'commit', commit: c, current: false }));
         if (more > 0) out.push({ kind: 'gap', more });
         if (current) out.push({ kind: 'commit', commit: current, current: true });
         return out;
       }
-      return commits.slice(0, 5).map((c) => ({
+      return window.map((c) => ({
         kind: 'commit',
         commit: c,
-        current: !!headSha && (c.sha === headSha || c.sha.startsWith(headSha)),
+        current: !!headSha && commitMatchesSha(c, headSha),
       }));
     }
 
@@ -717,6 +729,7 @@
         return;
       }
       let selected = '';
+      const headSha = updateCommitData.headSha || updateCtx?.headSha || null;
       for (const o of opts) {
         if (o.kind === 'gap') {
           const opt = document.createElement('option');
@@ -734,13 +747,21 @@
           opt.className = 'current-opt';
           opt.style.fontWeight = '700';
         }
-        if (o.current || (!selected && o.commit.sha === updateCtx?.headSha)) {
+        if (
+          o.current ||
+          (!selected &&
+            headSha &&
+            (o.commit.sha === headSha ||
+              o.commit.sha.startsWith(headSha) ||
+              headSha.startsWith(o.commit.sha)))
+        ) {
           selected = o.commit.sha;
         }
         sel.appendChild(opt);
       }
+      // Prefer machine HEAD; never fall back to origin tip when HEAD is known.
       if (selected) sel.value = selected;
-      else if (sel.options.length) sel.selectedIndex = 0;
+      else if (!headSha && sel.options.length) sel.selectedIndex = 0;
       syncUpdateApplyEnabled();
     }
 

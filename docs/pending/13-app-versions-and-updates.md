@@ -67,10 +67,12 @@ pfx = /opt/paradox/apps/PFx
 - Display name (path basename) + origin URL
 - Branch dropdown (current branch bold)
 - Commit dropdown:
-  - Default: last 5 on `origin/<branch>`, newest first; current HEAD bold
-  - If current branch and `behind > 4`: 4 newest, disabled “XX more recent commits”, then current HEAD
+  - Last 5 on `origin/<branch>`, newest first; machine HEAD bold when present
+  - On the **current branch**, if HEAD is not in that window: 4 newest, disabled “XX more recent commits”, then machine HEAD (bold)
+  - Other branches: do not force-append machine HEAD
+  - Preselect machine HEAD when shown; never default to origin tip while HEAD is known
   - Gap commits are not selectable
-- Apply enabled when selection differs from current branch/HEAD
+- Apply enabled when selection differs from current branch/HEAD (current selection is a no-op)
 - Leave/close/`beforeunload` while Apply runs: confirm Continue vs Cancel Update (not advised)
 
 ### API
