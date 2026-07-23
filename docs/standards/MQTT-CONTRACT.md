@@ -162,3 +162,7 @@ meaning):
 1. Update **this** document (and [README.md](README.md) index if adding a new standards file).
 2. Update affected app/room/prop docs in the **same** change set.
 3. Ensure every repo’s `AI-INSTRUCTIONS.md` still points at **`docs/standards/`** (the folder).
+
+This folder holds **public** suite contracts and the sanitized suite AI brief only. Internal
+triage, business roadmaps, and cross-cutting pending plans live in the private **Px-Suite** repo
+when present — do not add them here.

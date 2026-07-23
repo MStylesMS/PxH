@@ -87,7 +87,7 @@ nut_ups = cyberpower@127.0.0.1
 
    (watts when NUT reports or can estimate from load × nominal).
 
-See [pending/14-ups-telemetry.md](pending/14-ups-telemetry.md). Soften NUT `upsmon`
+See [SPEC.md](SPEC.md) §9–10 and [API.md](API.md) for UPS telemetry. Soften NUT `upsmon`
 `SHUTDOWNCMD` if you want telemetry only (default can halt the host on low battery).
 
 ## 9. Smoke checklist (§13)

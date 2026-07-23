@@ -6,7 +6,7 @@ _Product:_ **Paradox Health Monitor** (**PxH**)
 
 > Former **Paradox Hub** is now **Paradox Prime (PxP)**. This repo’s **PxH** means Health Monitor only.
 
-**Related:** [API.md](API.md) · [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md) · [pending plans](pending/INDEX.md) · [business overview](BUSINESS-OVERVIEW.html) · [suite standards](standards/)
+**Related:** [API.md](API.md) · [INSTALL.md](INSTALL.md) · [QUICK-SETUP.md](QUICK-SETUP.md) · [suite standards](standards/) · [pending (PxH-only)](pending/)
 
 ---
 
@@ -15,7 +15,8 @@ _Product:_ **Paradox Health Monitor** (**PxH**)
 Informal **Machine Health** prototype on some hosts (`health-api.js` on `:19090`,
 `paradox-health-api.service`, `/health/` HTML). Lab host **pi5-ssd** also has a one-off Hub —
 **out of product scope**, but must not collide with PxH defaults when both run for testing
-(see §12 and [pending/09-pi5-ssd-coexistence.md](pending/09-pi5-ssd-coexistence.md)).
+(see §12; lab coexistence with one-off Hub installs is an internal install concern, not part of
+this product contract).
 
 ---
 
@@ -40,8 +41,8 @@ PxH is the **host-local health beacon** on each Paradox room machine:
 footprint on 8–16 GB cards; installable on every host profile (only configured services matter).
 
 **Non-goals (PxH):** MQTT Explorer-style browsing (→ PxP MQTT Monitor); fleet orchestration
-(→ PxP + pxp-agent); game-run history / audit reports / people-counting / IM push (→ PxP/PxO
-plans — see [pending/INDEX.md](pending/INDEX.md)); unrestricted filesystem deletes.
+(→ PxP + pxp-agent); game-run history / audit reports / people-counting / IM push (→ PxP/PxO);
+unrestricted filesystem deletes.
 
 ---
 
@@ -136,7 +137,8 @@ Constraints:
 | D6 | Gated cleanup: `apt-get clean`, `npm cache clean`, IDE prune (§6) — never auto-delete media/room configs |
 | D7 | Document store-Pi policy: prune IDE leftovers; prefer ≥32 GB where practical |
 
-Suite log retention remains a companion track: [pending/02-suite-log-retention.md](pending/02-suite-log-retention.md).
+Suite log retention for `/opt/paradox/logs` remains a companion suite-wide track (owned outside
+this product contract).
 
 ---
 
@@ -192,8 +194,8 @@ poll), PxH runs `git fetch` and reports behind/HEAD for the Services grid.
 (including self-update of `paradox-health`). Refuses a dirty working tree. Commit SHAs must
 be ancestors of `origin/<branch>`. Gated by `[actions] allow_app_update`.
 
-Infra units (`mosquitto`, `nginx`) stay systemd-only. See
-[pending/13-app-versions-and-updates.md](pending/13-app-versions-and-updates.md).
+Infra units (`mosquitto`, `nginx`) stay systemd-only. Rooms-repo updates and Node-version
+reporting remain follow-on work.
 
 ---
 
@@ -307,7 +309,7 @@ PxD starter `room.json` includes an optional **System Health** link (`/health/` 
 ## 14. Explicitly deferred
 
 Premium IM push, remote summary portal, game JSONL UX, snapshots, people-count audit, daily owner
-reports — see [BUSINESS-OVERVIEW.html](BUSINESS-OVERVIEW.html) and [pending/INDEX.md](pending/INDEX.md).
+reports — owned by PxP / PxO (paid Prime lanes), not this product.
 
 ---
 

@@ -22,15 +22,16 @@ Former Hub product is **PxP**, not this repo.
 
 - [docs/SPEC.md](docs/SPEC.md) — product contract
 - [docs/API.md](docs/API.md) — HTTP + MQTT
-- [docs/standards/](docs/standards/) — **suite-wide standards** (MQTT contract and more); change here first, then propagate
+- [docs/standards/](docs/standards/) — **suite-wide public standards** (suite AI brief, MQTT contract); change here first, then propagate
+- [docs/pending/](docs/pending/) — **PxH-only** PR / implementation plans
 
 Update docs in the same change as behaviour. Commit prefixes: `Docs:`, `Implement:`, `Fix:`, …
 
 ## Suite standards
 
-Suite-wide contracts live in [docs/standards/](docs/standards/) (folder, not a single file).
-Read those before changing MQTT topics or shared conventions. If you change a standard, update
-the file under PxH first and propagate to other repos’ docs in the same work.
+Public suite brief + contracts live in [docs/standards/](docs/standards/) (folder, not a single file) — especially `AI-INSTRUCTIONS.md` and `MQTT-CONTRACT.md`. Read those before changing MQTT topics or shared conventions. If you change a standard, update the file under PxH first and propagate to other repos' docs in the same work.
+
+If the workspace has `Px-Suite/` (or `/opt/paradox/Px-Suite`), use it for internal notes, cross-cutting pending plans, and business overview — do **not** put those into this distributed standards folder.
 
 ## Layout
 
