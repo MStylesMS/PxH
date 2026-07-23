@@ -74,6 +74,9 @@ export interface MetricsSnapshot {
    */
   ram: { usedMb: number; totalMb: number; usedPercent: number };
   diskRoot: DiskRoot | null;
+  cpuLevel: ThresholdLevel;
+  tempLevel: ThresholdLevel;
+  ramLevel: ThresholdLevel;
   diskLevel: ThresholdLevel;
   aptUpdatesAvailable: number | null;
   /** Present when an upgrade status file exists (in progress or last result). */
@@ -209,6 +212,12 @@ export interface PxhConfig {
     password: string;
   };
   thresholds: {
+    cpuWarnPercent: number;
+    cpuCriticalPercent: number;
+    tempWarnC: number;
+    tempCriticalC: number;
+    ramWarnPercent: number;
+    ramCriticalPercent: number;
     diskWarnPercent: number;
     diskCriticalPercent: number;
     diskWarnFreeGb: number;

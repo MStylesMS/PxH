@@ -53,6 +53,26 @@ export function diskLevel(disk: DiskRoot | null, cfg: PxhConfig['thresholds']): 
   return 'ok';
 }
 
+export function cpuLevel(cpuPercent: number, cfg: PxhConfig['thresholds']): ThresholdLevel {
+  if (cpuPercent >= cfg.cpuCriticalPercent) return 'critical';
+  if (cpuPercent >= cfg.cpuWarnPercent) return 'warn';
+  return 'ok';
+}
+
+/** Null temp (unavailable) → ok for the level field; UI omits color when n/a. */
+export function tempLevel(cpuTempC: number | null, cfg: PxhConfig['thresholds']): ThresholdLevel {
+  if (cpuTempC == null) return 'ok';
+  if (cpuTempC >= cfg.tempCriticalC) return 'critical';
+  if (cpuTempC >= cfg.tempWarnC) return 'warn';
+  return 'ok';
+}
+
+export function ramLevel(usedPercent: number, cfg: PxhConfig['thresholds']): ThresholdLevel {
+  if (usedPercent >= cfg.ramCriticalPercent) return 'critical';
+  if (usedPercent >= cfg.ramWarnPercent) return 'warn';
+  return 'ok';
+}
+
 /** Read root filesystem via systeminformation, with df fallback. */
 export async function readDiskRoot(): Promise<DiskRoot | null> {
   try {
@@ -188,18 +208,23 @@ export async function collectMetrics(
     ]);
 
   const [one, five, fifteen] = loadavg();
+  const cpuPercent = round1(load.currentLoad);
+  const ram = ramFromSiMem(mem);
 
   const snap: MetricsSnapshot = {
     hostname: cfg.machine.hostname || osHostname(),
     timestamp: new Date().toISOString(),
     uptimeSeconds: Math.round(time.uptime),
     load: { one: round1(one), five: round1(five), fifteen: round1(fifteen) },
-    cpuPercent: round1(load.currentLoad),
+    cpuPercent,
     cpuTempC: cpuTemp,
     gpuTempC: cpuTemp,
     gpuMemMb: gpuMem,
-    ram: ramFromSiMem(mem),
+    ram,
     diskRoot,
+    cpuLevel: cpuLevel(cpuPercent, cfg.thresholds),
+    tempLevel: tempLevel(cpuTemp, cfg.thresholds),
+    ramLevel: ramLevel(ram.usedPercent, cfg.thresholds),
     diskLevel: diskLevel(diskRoot, cfg.thresholds),
     aptUpdatesAvailable: aptUpdates,
     sudoNopasswd,

@@ -81,7 +81,7 @@ limits, auth, prune. Full sample: [config/pxh.example.ini](../config/pxh.example
 |---------|---------|
 | `[server]` | bind host/port (`0.0.0.0` default), `serve_ui` |
 | `[machine]` | `id` (MQTT `<id>`), display hostname |
-| `[thresholds]` | disk warn/critical % and free-GB floors |
+| `[thresholds]` | CPU / temp / RAM / disk warn/critical bands (and disk free-GB floors) |
 | `[services]` | required / optional / user units; `scan_conflicts` (default true) |
 | `[apps]` | unit → absolute path for Paradox app git checkouts (version inventory) |
 | `[mqtt]` | broker, `topic_root` (default `paradox`), optional `topic_base` override, interval |
@@ -219,6 +219,10 @@ Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, **UPS** (after Upd
 tile), plus a **Services** grid (same ~⅓ width cards as the warning panels) with contextual
 unit controls and, for Paradox apps in `[apps]`, an update gear / “Update available.” modal
 for branch/commit checkout.
+
+**CPU / Temp / RAM / Disk** cards use ok/warn/critical value colors from `[thresholds]`
+(defaults: CPU 80%/95%, temp 70°C/80°C, RAM 80%/95%, disk 85%/95% plus free-GB floors).
+Temp `n/a` stays uncolored. **UPS** colors from `[ups]` battery/runtime bands (Plan 14).
 
 UPS card: primary = estimated runtime minutes; two-line subtitle —
 line 1 `Batt. {charge}% · {On AC|On battery|…}`, line 2 `Load {load}% · {watts} W`

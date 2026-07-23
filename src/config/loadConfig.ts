@@ -181,6 +181,12 @@ export function loadConfig(configPath: string): PxhConfig {
       password: str(mq.password),
     },
     thresholds: {
+      cpuWarnPercent: num(t.cpu_warn_percent, 80),
+      cpuCriticalPercent: num(t.cpu_critical_percent, 95),
+      tempWarnC: num(t.temp_warn_c, 70),
+      tempCriticalC: num(t.temp_critical_c, 80),
+      ramWarnPercent: num(t.ram_warn_percent, 80),
+      ramCriticalPercent: num(t.ram_critical_percent, 95),
       diskWarnPercent: num(t.disk_warn_percent, 85),
       diskCriticalPercent: num(t.disk_critical_percent, 95),
       diskWarnFreeGb: num(t.disk_warn_free_gb, 0),

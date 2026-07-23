@@ -17,7 +17,7 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/` or `/health` | `{ status, version, name }` |
-| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `diskLevel`, **ups**, optional `aptUpgrade`, optional `topConsumers` |
+| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `cpuLevel` / `tempLevel` / `ramLevel` / `diskLevel`, **ups**, optional `aptUpgrade`, optional `topConsumers` |
 | `GET` | `/services` | Configured systemd units with `state`, `tier`, `enabled`, `pid`, `extraProcesses` |
 | `GET` | `/runtime` | Alias of `/services` (prototype compatibility) |
 | `GET` | `/apps/versions` | Paradox app git inventory (fetch `origin`, compare current branch; on-demand) |
@@ -34,13 +34,22 @@ Derived from Linux **MemAvailable** (`systeminformation` `available`):
 `usedMb = total − available`, `usedPercent = used / total`.  
 This excludes reclaimable buff/cache (unlike `MemTotal − MemFree`, which often looks ~80–90% “full” on healthy Pis).
 
+### Threshold levels (`ok` | `warn` | `critical`)
+
+From `[thresholds]` (UI tile colors; no MQTT alerts for CPU/temp/RAM yet):
+
+| Field | Source | Defaults (warn / critical) |
+|-------|--------|----------------------------|
+| `cpuLevel` | `cpuPercent` | ≥ 80% / ≥ 95% |
+| `tempLevel` | `cpuTempC` | ≥ 70°C / ≥ 80°C (`null` → `ok`) |
+| `ramLevel` | `ram.usedPercent` | ≥ 80% / ≥ 95% |
+| `diskLevel` | `diskRoot` % and free-GB floors | ≥ 85% / ≥ 95% (or ≤1 GB free) |
+
 ### `diskRoot` (required when `/` readable)
 
 ```json
 { "totalGb": 14.5, "usedGb": 12.1, "availableGb": 2.4, "usedPercent": 83.4 }
 ```
-
-`diskLevel`: `ok` | `warn` | `critical` from `[thresholds]`.
 
 ### `aptUpgrade` (when status is available)
 

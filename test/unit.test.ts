@@ -9,7 +9,7 @@ import {
   topicMatches,
   matchWarningColor,
 } from '../src/config/loadConfig.js';
-import { diskLevel, ramFromSiMem } from '../src/metrics/collector.js';
+import { diskLevel, ramFromSiMem, cpuLevel, tempLevel, ramLevel } from '../src/metrics/collector.js';
 import {
   parseUpscOutput,
   mapUpsStatus,
@@ -62,6 +62,12 @@ describe('matchWarningColor', () => {
 
 describe('diskLevel', () => {
   const thr = {
+    cpuWarnPercent: 80,
+    cpuCriticalPercent: 95,
+    tempWarnC: 70,
+    tempCriticalC: 80,
+    ramWarnPercent: 80,
+    ramCriticalPercent: 95,
     diskWarnPercent: 85,
     diskCriticalPercent: 95,
     diskWarnFreeGb: 0,
@@ -84,6 +90,69 @@ describe('diskLevel', () => {
   });
 });
 
+describe('cpuLevel', () => {
+  const thr = {
+    cpuWarnPercent: 80,
+    cpuCriticalPercent: 95,
+    tempWarnC: 70,
+    tempCriticalC: 80,
+    ramWarnPercent: 80,
+    ramCriticalPercent: 95,
+    diskWarnPercent: 85,
+    diskCriticalPercent: 95,
+    diskWarnFreeGb: 0,
+    diskCriticalFreeGb: 1,
+  };
+  it('ok / warn / critical by percent', () => {
+    assert.equal(cpuLevel(50, thr), 'ok');
+    assert.equal(cpuLevel(80, thr), 'warn');
+    assert.equal(cpuLevel(94.9, thr), 'warn');
+    assert.equal(cpuLevel(95, thr), 'critical');
+  });
+});
+
+describe('tempLevel', () => {
+  const thr = {
+    cpuWarnPercent: 80,
+    cpuCriticalPercent: 95,
+    tempWarnC: 70,
+    tempCriticalC: 80,
+    ramWarnPercent: 80,
+    ramCriticalPercent: 95,
+    diskWarnPercent: 85,
+    diskCriticalPercent: 95,
+    diskWarnFreeGb: 0,
+    diskCriticalFreeGb: 1,
+  };
+  it('ok / warn / critical by °C; null is ok', () => {
+    assert.equal(tempLevel(null, thr), 'ok');
+    assert.equal(tempLevel(65, thr), 'ok');
+    assert.equal(tempLevel(70, thr), 'warn');
+    assert.equal(tempLevel(79.9, thr), 'warn');
+    assert.equal(tempLevel(80, thr), 'critical');
+  });
+});
+
+describe('ramLevel', () => {
+  const thr = {
+    cpuWarnPercent: 80,
+    cpuCriticalPercent: 95,
+    tempWarnC: 70,
+    tempCriticalC: 80,
+    ramWarnPercent: 80,
+    ramCriticalPercent: 95,
+    diskWarnPercent: 85,
+    diskCriticalPercent: 95,
+    diskWarnFreeGb: 0,
+    diskCriticalFreeGb: 1,
+  };
+  it('ok / warn / critical by used percent', () => {
+    assert.equal(ramLevel(44.8, thr), 'ok');
+    assert.equal(ramLevel(80, thr), 'warn');
+    assert.equal(ramLevel(94.9, thr), 'warn');
+    assert.equal(ramLevel(95, thr), 'critical');
+  });
+});
 describe('ramFromSiMem', () => {
   it('uses MemAvailable (total − available), not total − free', () => {
     // 1795 MiB total, ~991 MiB available → ~45% used (Agent 22-like)
@@ -231,6 +300,9 @@ rule.1.color = pfx
     assert.equal(cfg.services.scanConflicts, true);
     assert.equal(cfg.warnings.rules[0].color, 'pfx');
     assert.equal(cfg.server.host, '0.0.0.0');
+    assert.equal(cfg.thresholds.cpuWarnPercent, 80);
+    assert.equal(cfg.thresholds.tempCriticalC, 80);
+    assert.equal(cfg.thresholds.ramWarnPercent, 80);
     assert.equal(cfg.apps['paradox-health'], DEFAULT_APP_PATHS['paradox-health']);
     assert.equal(cfg.apps.pxo, DEFAULT_APP_PATHS.pxo);
     unlinkSync(path);
