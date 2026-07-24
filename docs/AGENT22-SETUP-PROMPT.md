@@ -88,7 +88,7 @@ topic_root = paradox
 required = mosquitto,nginx,pfx
 optional = paradox-health
 user =
-; Add room game / bridge units if present, e.g. user = houdini-game — or Agent22 equivalents
+; Add room game / bridge units if present, e.g. user = pxo — or Agent22 equivalents
 ```
 
 Publish prefix becomes `paradox/agent22/system/{health,disk,services,alerts}`.
