@@ -9,7 +9,7 @@ Type=simple
 User=paradox
 Group=paradox
 WorkingDirectory=/opt/paradox/apps/PxH
-ExecStart=/usr/bin/node /opt/paradox/apps/PxH/dist/index.js --config /opt/paradox/config/pxh.ini
+ExecStart=/usr/local/bin/node /opt/paradox/apps/PxH/dist/index.js --config /opt/paradox/config/pxh.ini
 Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production

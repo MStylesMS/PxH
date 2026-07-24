@@ -20,7 +20,7 @@ Houdini already has a working reference install under `/opt/paradox/apps/PxH` an
 - App path: `/opt/paradox/apps/PxH`
 - Config: `/opt/paradox/config/pxh.ini`
 - Unit: `paradox-health.service` (user `paradox`)
-- Node.js **≥ 20** required (install NodeSource 20.x if missing)
+- Node.js **24 LTS** required (`/usr/local/bin/node`; install official binary or NodeSource 24.x if missing)
 - Do **not** invent a separate password store — PAM against local OS users
 - Do **not** break existing PFx / game / nginx / MQTT paths
 - Prefer additive nginx snippets; reload nginx after merge
@@ -38,12 +38,30 @@ ls /opt/paradox/apps
 systemctl is-active mosquitto nginx pfx 2>/dev/null || true
 ```
 
-If Node is missing or &lt; 20:
+If **Tailscale** is set up on this host, disable Raspberry Pi Connect (standard on all
+Paradox Pis — saves RAM/CPU; use Tailscale SSH instead):
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+tailscale status | head
+command -v rpi-connect >/dev/null && rpi-connect off
+rpi-connect status
+```
+
+If Node is missing, not under `/usr/local/bin`, or &lt; 24:
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
 sudo apt-get install -y nodejs
-node -v   # expect v20.x
+node -v   # expect v24.x LTS
+which node  # prefer /usr/local/bin/node for systemd units
+```
+
+If Debian/Raspberry Pi OS still ships an older `/usr/bin/node` via apt, remove it after
+installing 24 LTS so services do not pick up the wrong runtime:
+
+```bash
+sudo apt-get remove -y nodejs
+/usr/local/bin/node -v
 ```
 
 ### 2. Clone PxH
@@ -88,7 +106,7 @@ topic_root = paradox
 required = mosquitto,nginx,pfx
 optional = paradox-health
 user =
-; Add room game / bridge units if present, e.g. user = houdini-game — or Agent22 equivalents
+; Add room game / bridge units if present, e.g. user = pxo — or Agent22 equivalents
 ```
 
 Publish prefix becomes `paradox/agent22/system/{health,disk,services,alerts}`.

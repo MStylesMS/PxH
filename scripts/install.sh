@@ -27,6 +27,10 @@ rsync -a --delete --exclude node_modules --exclude dist "$REPO_ROOT/" "$APP_DIR/
 cd "$APP_DIR"
 chmod +x scripts/pam-auth.py scripts/install.sh \
   scripts/os-upgrade.sh scripts/os-upgrade-launch.sh
+# nginx (www-data) serves public/ at /health/ — must be world-readable
+chmod 755 "$APP_DIR/public"
+chmod -R a+r "$APP_DIR/public"
+find "$APP_DIR/public" -type d -exec chmod 755 {} +
 # typescript is a devDependency — install it for build, then prune for runtime
 sudo -u paradox npm install
 sudo -u paradox npm run build

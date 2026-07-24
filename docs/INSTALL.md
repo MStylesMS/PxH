@@ -4,7 +4,7 @@ Install PxH on a Debian / Raspberry Pi OS host under `/opt/paradox`.
 
 ## Prerequisites
 
-- Node.js ≥ 20
+- Node.js **24 LTS** (`/usr/local/bin/node`)
 - User/group `paradox`
 - MQTT broker reachable (often `127.0.0.1:1883`, not required to be local)
 - Optional: nginx for preferred `/health/` URLs

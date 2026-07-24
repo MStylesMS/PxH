@@ -10,6 +10,8 @@ import {
   matchWarningColor,
 } from '../src/config/loadConfig.js';
 import { diskLevel, ramFromSiMem, cpuLevel, tempLevel, ramLevel } from '../src/metrics/collector.js';
+import { msUntilNextLocalHour } from '../src/metrics/aptUpdateCache.js';
+import { parseProcSwaps } from '../src/metrics/swap.js';
 import {
   parseUpscOutput,
   mapUpsStatus,
@@ -153,6 +155,7 @@ describe('ramLevel', () => {
     assert.equal(ramLevel(95, thr), 'critical');
   });
 });
+
 describe('ramFromSiMem', () => {
   it('uses MemAvailable (total − available), not total − free', () => {
     // 1795 MiB total, ~991 MiB available → ~45% used (Agent 22-like)
@@ -167,6 +170,46 @@ describe('ramFromSiMem', () => {
     const ram = ramFromSiMem({ total: 1000, available: 2000 });
     assert.equal(ram.usedMb, 0);
     assert.equal(ram.usedPercent, 0);
+  });
+});
+
+describe('parseProcSwaps', () => {
+  it('splits zram and disk swap', () => {
+    const raw = `Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority
+/dev/zram0                              partition\t2097152\t\t512\t\t100
+/swapfile                               file\t\t4194304\t\t1024\t\t-2
+`;
+    const s = parseProcSwaps(raw);
+    assert.ok(s);
+    assert.equal(s!.zram?.totalMb, 2048);
+    assert.equal(s!.zram?.usedMb, 1);
+    assert.equal(s!.disk?.totalMb, 4096);
+    assert.equal(s!.disk?.usedMb, 1);
+    assert.equal(s!.totalMb, 6144);
+    assert.equal(s!.usedMb, 2);
+    assert.equal(s!.usedPercent, 0);
+  });
+
+  it('returns empty swap when no devices', () => {
+    const s = parseProcSwaps('Filename\tType\tSize\tUsed\tPriority\n');
+    assert.ok(s);
+    assert.equal(s!.totalMb, 0);
+    assert.equal(s!.zram, null);
+    assert.equal(s!.disk, null);
+  });
+});
+
+describe('msUntilNextLocalHour', () => {
+  it('targets today when before the hour', () => {
+    const now = new Date(2026, 6, 23, 1, 30, 0);
+    const ms = msUntilNextLocalHour(3, now);
+    assert.equal(ms, 90 * 60 * 1000);
+  });
+
+  it('targets tomorrow when at or after the hour', () => {
+    const now = new Date(2026, 6, 23, 3, 0, 0);
+    const ms = msUntilNextLocalHour(3, now);
+    assert.equal(ms, 24 * 60 * 60 * 1000);
   });
 });
 
