@@ -46,6 +46,9 @@ touching the others as long as the MQTT contract holds.
 
 ## Working conventions (all repos)
 
+- **Node.js runtime**: **24 LTS** is the suite default for development, CI, and venue hosts.
+  Pin it in each Node app's `package.json` `engines.node` (and `.nvmrc` where used). Existing
+  installs on Node 18/20 must be upgraded to Node 24 LTS before running current app versions.
 - **Documentation-first.** Specify non-trivial behaviour in `docs/` before coding; update docs in
   the same commit as code. The doc is the contract.
 - **Conventional commit prefixes**: `Docs:`, `Implement:`, `Fix:`, `Test:`, `Refactor:`, `Chore:`.
