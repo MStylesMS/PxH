@@ -34,6 +34,19 @@ After login, each unit shows contextual **Start** or **Stop**, **Restart**, and 
 Default `host = 0.0.0.0` so LAN and Tailscale clients can **view** metrics without login.
 Only maintenance actions require a local OS username/password (PAM) and a session cookie.
 
+## 4b. Remote access (Tailscale)
+
+When **Tailscale** is the operator access path for a Pi, disable **Raspberry Pi Connect**
+(it runs wayvnc + rpi-connectd and consumes RAM/CPU we need for game + dev work):
+
+```bash
+command -v rpi-connect >/dev/null && rpi-connect off
+rpi-connect status   # screen sharing + remote shell should be off/disabled
+```
+
+Re-enable only if Tailscale is removed and Pi Connect is needed again: `rpi-connect on`.
+Apply on every Paradox Pi once Tailscale is verified (`tailscale status`).
+
 ## 5. sudoers (required for actions)
 
 Confirm:
