@@ -8,8 +8,10 @@ import { hostname as osHostname, loadavg, homedir } from 'node:os';
 import { resolve } from 'node:path';
 import si from 'systeminformation';
 import type { DiskRoot, MetricsSnapshot, PxhConfig, ThresholdLevel, TopConsumer } from '../types.js';
+import { getCachedAptUpdateCount } from './aptUpdateCache.js';
 import { getAptUpgradeMetrics } from '../actions/upgradeStatus.js';
 import { collectUps } from './ups.js';
+import { readSwapInfo } from './swap.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -139,19 +141,6 @@ async function readGpuMemMb(): Promise<number | null> {
   return null;
 }
 
-async function aptUpdateCount(): Promise<number | null> {
-  try {
-    const { stdout } = await execFileAsync('bash', [
-      '-c',
-      "apt list --upgradable 2>/dev/null | grep -v '^Listing' | grep '/' | wc -l",
-    ]);
-    const n = Number(stdout.trim());
-    return Number.isFinite(n) ? n : null;
-  } catch {
-    return null;
-  }
-}
-
 async function checkSudoNopasswd(): Promise<boolean | null> {
   if (process.platform !== 'linux') return null;
   try {
@@ -193,7 +182,7 @@ export async function collectMetrics(
   cfg: PxhConfig,
   opts?: { topConsumers?: boolean },
 ): Promise<MetricsSnapshot> {
-  const [load, mem, time, diskRoot, cpuTemp, gpuMem, aptUpdates, sudoNopasswd, aptUpgrade, ups] =
+  const [load, mem, time, diskRoot, cpuTemp, gpuMem, sudoNopasswd, aptUpgrade, ups, swap] =
     await Promise.all([
       si.currentLoad(),
       si.mem(),
@@ -201,11 +190,12 @@ export async function collectMetrics(
       readDiskRoot(),
       readCpuTemp(),
       readGpuMemMb(),
-      aptUpdateCount(),
       checkSudoNopasswd(),
       getAptUpgradeMetrics(),
       collectUps(cfg),
+      readSwapInfo(),
     ]);
+  const aptUpdates = getCachedAptUpdateCount();
 
   const [one, five, fifteen] = loadavg();
   const cpuPercent = round1(load.currentLoad);
@@ -221,6 +211,7 @@ export async function collectMetrics(
     gpuTempC: cpuTemp,
     gpuMemMb: gpuMem,
     ram,
+    swap,
     diskRoot,
     cpuLevel: cpuLevel(cpuPercent, cfg.thresholds),
     tempLevel: tempLevel(cpuTemp, cfg.thresholds),

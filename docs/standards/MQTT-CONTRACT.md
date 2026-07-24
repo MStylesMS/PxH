@@ -141,7 +141,25 @@ Do not use `pzb/` for MQTT (legacy name may remain only in old filenames such as
 
 ---
 
-## 7. Where to read more
+## 7. PFx process namespace
+
+PFx separates **process** traffic from **zone** traffic:
+
+| Role | Config key | Suite practice | Publishes / subscribes |
+|------|------------|----------------|------------------------|
+| Process root | `[mqtt] base_topic` | `paradox/<room>/pfx` | `{base_topic}/discovery` (retained zone catalog) |
+| Process heartbeat | `[global] heartbeat_topic` | `paradox/<room>/pfx/heartbeat` | Periodic liveness (full topic; nothing appended) |
+| Zone root | `[screen:…]` / `[audio:…]` `topic` | `paradox/<room>/<zone>` | `{topic}/{commands,state,events,warnings,schema}` |
+
+Examples: `paradox/spycatcher/moscow/pfx`, `paradox/houdini/pfx`.
+
+Do **not** set `[mqtt] base_topic` to a zone leaf (`…/audio`, `…/mirror`). Do **not** put PFx heartbeats on `paradox/props`.
+
+Per-app detail: `apps/PFx/docs/MQTT_API.md`, `apps/PFx/docs/CONFIG_INI.md`.
+
+---
+
+## 8. Where to read more
 
 | Concern | Doc |
 |---------|-----|
@@ -154,7 +172,7 @@ Do not use `pzb/` for MQTT (legacy name may remain only in old filenames such as
 
 ---
 
-## 8. Propagation duty
+## 9. Propagation duty
 
 If you change this file (or discover that another repo documents a conflicting suite MQTT
 meaning):

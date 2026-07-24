@@ -14,9 +14,12 @@ inside distributed PxH.
 | Document | Purpose |
 |----------|---------|
 | [AI-INSTRUCTIONS.md](AI-INSTRUCTIONS.md) | Sanitized whole-suite AI brief (system map, conventions) |
-| [MQTT-CONTRACT.md](MQTT-CONTRACT.md) | MQTT topic trees, retain rules, prop announce vs state, host `system/*` vs room warnings |
+| [MQTT-CONTRACT.md](MQTT-CONTRACT.md) | MQTT topic trees, retain rules, PFx/PxB process namespaces, prop announce vs state, host `system/*` vs room warnings |
 
 Add new suite-wide **public** standards here as separate markdown files and list them in this table.
+
+**Private (not here):** clone URLs, triage, and cross-cutting plans live in **Px-Suite**
+(`/opt/paradox/Px-Suite`, especially `REPOS.md` and `notes/SUITE-NOTES.md`).
 
 ## Change control (required)
 

@@ -9,6 +9,19 @@ export interface DiskRoot {
   usedPercent: number;
 }
 
+export interface SwapDevice {
+  usedMb: number;
+  totalMb: number;
+}
+
+export interface SwapInfo {
+  usedMb: number;
+  totalMb: number;
+  usedPercent: number;
+  zram: SwapDevice | null;
+  disk: SwapDevice | null;
+}
+
 export type ThresholdLevel = 'ok' | 'warn' | 'critical';
 
 export type UpsStatus =
@@ -73,6 +86,7 @@ export interface MetricsSnapshot {
    * usedPercent = usedMb / totalMb.
    */
   ram: { usedMb: number; totalMb: number; usedPercent: number };
+  swap: SwapInfo | null;
   diskRoot: DiskRoot | null;
   cpuLevel: ThresholdLevel;
   tempLevel: ThresholdLevel;

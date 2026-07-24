@@ -10,6 +10,7 @@ import { loadConfig, resolveConfigPath } from './config/loadConfig.js';
 import { createServer } from './server/server.js';
 import { MqttHub } from './mqtt/hub.js';
 import { collectMetrics } from './metrics/collector.js';
+import { startAptUpdateCache, stopAptUpdateCache } from './metrics/aptUpdateCache.js';
 import { getRuntimeServices } from './runtime/services.js';
 import { RingBuffer } from './panels/ringBuffer.js';
 import { PruneScheduler } from './runtime/pruneScheduler.js';
@@ -56,6 +57,7 @@ try {
     console.log(`[pxh] System Health UI: http://${config.server.host}:${config.server.port}/ui/`);
   }
   mqtt.start();
+  startAptUpdateCache();
   pruneScheduler.start();
 } catch (err) {
   console.error('[pxh] Failed to start:', err);
@@ -64,6 +66,7 @@ try {
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`[pxh] Shutdown (${signal})…`);
+  stopAptUpdateCache();
   pruneScheduler.stop();
   await mqtt.stop();
   await server.close();

@@ -77,7 +77,10 @@ paradox/
     PFx/ PFxE/ PxO/ PxC/ PxT/ Pio/ PxB/ PxD/ ...
   rooms/        Game packages
   props/        Prop firmware
+  Px-Suite/     Private suite notes / pending / business (internal machines only)
 ```
+
+Canonical clone URLs for all suite repos live in **Px-Suite** `REPOS.md` (one file to update when a home moves).
 
 > Note: The former product **Paradox Hub** is now **Paradox Prime (PxP)**. The acronym **PxH**
 > now means **Paradox Health Monitor** only. The remote agent binary remains `pxp-agent`

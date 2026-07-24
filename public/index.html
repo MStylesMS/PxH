@@ -538,7 +538,7 @@
       const diskCls = levelClass(m.diskLevel);
       const diskVal = disk ? `${disk.usedPercent}%` : 'n/a';
       const diskSub = disk
-        ? `${disk.usedGb} / ${disk.totalGb} GB · ${disk.availableGb} GB free`
+        ? `${disk.usedGb} / ${disk.totalGb} GB<br>${disk.availableGb} GB free`
         : 'disk metrics unavailable';
       document.getElementById('cards').innerHTML = [
         card('Host', m.hostname || '—', m.timestamp),
@@ -557,6 +557,19 @@
           `${m.ram?.usedMb} / ${m.ram?.totalMb} MB used (excl. cache)`,
           levelClass(m.ramLevel),
         ),
+        (() => {
+          const s = m.swap;
+          if (!s) return card('Swap', 'n/a', 'swap metrics unavailable');
+          if (s.totalMb === 0) return card('Swap', 'none', 'no swap configured');
+          const lines = [];
+          if (s.zram) lines.push(`zram ${s.zram.usedMb} / ${s.zram.totalMb} MB`);
+          if (s.disk) lines.push(`disk ${s.disk.usedMb} / ${s.disk.totalMb} MB`);
+          return card(
+            'Swap',
+            `${s.usedPercent}%`,
+            lines.length ? lines.join('<br>') : `${s.usedMb} / ${s.totalMb} MB`,
+          );
+        })(),
         card('Disk', diskVal, diskSub, diskCls),
         (() => {
           const up = m.aptUpgrade;
