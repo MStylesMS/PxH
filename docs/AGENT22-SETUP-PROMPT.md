@@ -104,10 +104,18 @@ topic_root = paradox
 [services]
 ; Trim to units that exist on this host (systemctl list-units --type=service)
 required = mosquitto,nginx,pfx
-optional = paradox-health
+optional = paradox-health,paradox-speech
 user =
 ; Add room game / bridge units if present, e.g. user = pxo — or Agent22 equivalents
+
+[apps]
+; …existing app paths…
+pxs = /opt/paradox/apps/PxS
 ```
+
+When installing **Paradox Speech (PxS)** on this host, also follow `apps/PxS/docs/INSTALL.md`
+(systemd `paradox-speech.service`, nginx `/speech/`, venue `pxs.ini`). Do not remove other room
+units while adding speech.
 
 Publish prefix becomes `paradox/agent22/system/{health,disk,services,alerts}`.
 
