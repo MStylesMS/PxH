@@ -141,7 +141,30 @@ Do not use `pzb/` for MQTT (legacy name may remain only in old filenames such as
 
 ---
 
-## 7. PFx process namespace
+## 7. PxS (Paradox Speech) process namespace
+
+Speech services use a process root under the room tree (not a media zone leaf):
+
+```
+paradox/<room>/speech/{commands,state,events,warnings}
+```
+
+Example (Agent22): `paradox/agent22/speech`.
+
+| Role | Practice |
+|------|----------|
+| Heartbeat / snapshot | Retained `{base}/state` (default ~10s; configurable) |
+| Live caption partials | **WebSocket** from PxS (not high-rate MQTT partials) |
+| Finals / TTS lifecycle | Optional low-rate `{base}/events` |
+| STT phase gating | Driven by room game `{roomRoot}/state` (PxO) |
+
+Per-app detail: `apps/PxS/docs/SPEC.md`, `apps/PxS/docs/MQTT_API.md` (when present).
+
+Do **not** put speech heartbeats on `paradox/props`. Do **not** use `/status` instead of `/state`.
+
+---
+
+## 8. PFx process namespace
 
 PFx separates **process** traffic from **zone** traffic:
 
@@ -159,12 +182,12 @@ Per-app detail: `apps/PFx/docs/MQTT_API.md`, `apps/PFx/docs/CONFIG_INI.md`.
 
 ---
 
-## 8. Where to read more
+## 9. Where to read more
 
 | Concern | Doc |
 |---------|-----|
 | PxO game / zone API | `apps/PxO/docs/MQTT_API.md` |
-| PFx / PFxE / Pio / PxB / PxC / PxT | each app’s `docs/MQTT_API.md` (or CONFIG) |
+| PFx / PFxE / Pio / PxB / PxC / PxT / **PxS** | each app’s `docs/MQTT_API.md` (or CONFIG / SPEC) |
 | PxH host MQTT | `apps/PxH/docs/API.md`, `SPEC.md` |
 | PxD topicRoot / warningTopics | `apps/PxD/docs/ROOMS.md` |
 | SpyCatcher full map | `rooms/spycatcher/docs/MQTT-TOPICS.md` |
@@ -172,7 +195,7 @@ Per-app detail: `apps/PFx/docs/MQTT_API.md`, `apps/PFx/docs/CONFIG_INI.md`.
 
 ---
 
-## 9. Propagation duty
+## 10. Propagation duty
 
 If you change this file (or discover that another repo documents a conflicting suite MQTT
 meaning):
