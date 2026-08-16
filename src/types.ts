@@ -182,6 +182,8 @@ export type CommitSelectOption =
 
 /** Default unit → checkout path conventions (overridden by [apps] in pxh.ini). */
 export const DEFAULT_APP_PATHS: Record<string, string> = {
+  pxh: '/opt/paradox/apps/PxH',
+  /** @deprecated legacy unit name; prefer pxh */
   'paradox-health': '/opt/paradox/apps/PxH',
   pfx: '/opt/paradox/apps/PFx',
   pfxe: '/opt/paradox/apps/PFxE',

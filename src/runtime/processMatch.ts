@@ -44,6 +44,9 @@ const MATCHERS: Record<string, (cmd: string) => boolean> = {
   pfxe: (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PFXe?\//.test(c)
     || /^\s*(?:\S*\/)?node(?:js)?\s+\S*pfxe\.js(?:\s|$)/.test(c),
+  pxh: (c) =>
+    /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxH\/(?:dist\/index\.js|src\/index\.(?:js|ts))(?:\s|$)/.test(c),
+  /** Legacy unit name before rename to pxh.service */
   'paradox-health': (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxH\/(?:dist\/index\.js|src\/index\.(?:js|ts))(?:\s|$)/.test(c),
   mosquitto: (c) =>

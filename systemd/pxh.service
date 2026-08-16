@@ -1,7 +1,5 @@
-# DEPRECATED: use pxh.service (unit name "pxh" for PxH UI / allowlist).
-# Kept only as a redirect-style note for older installs.
 [Unit]
-Description=Paradox Health Monitor (PxH) [legacy alias — prefer pxh.service]
+Description=Paradox Health Monitor (PxH)
 Documentation=https://github.com/MStylesMS/PxH
 After=network-online.target
 Wants=network-online.target
@@ -15,6 +13,7 @@ ExecStart=/usr/local/bin/node /opt/paradox/apps/PxH/dist/index.js --config /opt/
 Restart=on-failure
 RestartSec=5
 Environment=NODE_ENV=production
+# PAM auth helper + metrics need a normal home for IDE prune paths
 Environment=HOME=/home/paradox
 SyslogIdentifier=pxh
 
