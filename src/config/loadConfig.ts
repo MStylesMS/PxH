@@ -194,7 +194,7 @@ export function loadConfig(configPath: string): PxhConfig {
     },
     services: {
       required: csv(svc.required || 'mosquitto,nginx,pfx,pxo'),
-      optional: csv(svc.optional || 'paradox-health,pxb,pxt,pxc,pfxe,pio'),
+      optional: csv(svc.optional || 'paradox-health,pxb,pxt,pxc,pfxe,pxio,paradox-speech'),
       user: csv(svc.user),
       scanConflicts: bool(svc.scan_conflicts, true),
     },

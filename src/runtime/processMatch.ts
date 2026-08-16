@@ -30,8 +30,13 @@ const MATCHERS: Record<string, (cmd: string) => boolean> = {
   /** Legacy unit name (pre-rename); still recognize game.js processes. */
   'moscow-game': (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxO\/src\/game\.js(?:\s|$)/.test(c),
+  pxio: (c) =>
+    /^\s*(?:\/\S+\/)?pxio\s+--config(?:\s|=|$)/.test(c)
+    || /^\s*(?:\/\S+\/)?pio\s+--config(?:\s|=|$)/.test(c),
+  /** Legacy unit name before Pio→PxIO rename */
   pio: (c) =>
-    /^\s*(?:\/\S+\/)?pio\s+--config(?:\s|=|$)/.test(c),
+    /^\s*(?:\/\S+\/)?pxio\s+--config(?:\s|=|$)/.test(c)
+    || /^\s*(?:\/\S+\/)?pio\s+--config(?:\s|=|$)/.test(c),
   pxb: (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxB\//.test(c),
   pxt: (c) =>
