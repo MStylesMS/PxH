@@ -269,6 +269,7 @@ Default patterns (example ini):
 - `paradox/+/pio/warnings` → `pio`
 - `paradox/+/pxb/warnings`, `paradox/+/pxb/+/warnings` → `pxb`
 - `paradox/+/pxt/warnings` → `pxt`
+- `paradox/+/speech/warnings` → `pxs` (Paradox Speech / PxS)
 - `paradox/+/+/warnings` (game / catch-all) → `game` (lower priority than specific rules)
 - `paradox/props` → props panel (not warnings)
 

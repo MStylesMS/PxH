@@ -30,8 +30,13 @@ const MATCHERS: Record<string, (cmd: string) => boolean> = {
   /** Legacy unit name (pre-rename); still recognize game.js processes. */
   'moscow-game': (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxO\/src\/game\.js(?:\s|$)/.test(c),
+  pxio: (c) =>
+    /^\s*(?:\/\S+\/)?pxio\s+--config(?:\s|=|$)/.test(c)
+    || /^\s*(?:\/\S+\/)?pio\s+--config(?:\s|=|$)/.test(c),
+  /** Legacy unit name before Pio→PxIO rename */
   pio: (c) =>
-    /^\s*(?:\/\S+\/)?pio\s+--config(?:\s|=|$)/.test(c),
+    /^\s*(?:\/\S+\/)?pxio\s+--config(?:\s|=|$)/.test(c)
+    || /^\s*(?:\/\S+\/)?pio\s+--config(?:\s|=|$)/.test(c),
   pxb: (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxB\//.test(c),
   pxt: (c) =>
@@ -39,6 +44,9 @@ const MATCHERS: Record<string, (cmd: string) => boolean> = {
   pfxe: (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PFXe?\//.test(c)
     || /^\s*(?:\S*\/)?node(?:js)?\s+\S*pfxe\.js(?:\s|$)/.test(c),
+  pxh: (c) =>
+    /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxH\/(?:dist\/index\.js|src\/index\.(?:js|ts))(?:\s|$)/.test(c),
+  /** Legacy unit name before rename to pxh.service */
   'paradox-health': (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxH\/(?:dist\/index\.js|src\/index\.(?:js|ts))(?:\s|$)/.test(c),
   mosquitto: (c) =>

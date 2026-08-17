@@ -81,13 +81,16 @@ export async function runServiceAction(
     return { ok: false, message: 'Service control is only supported on Linux' };
   }
   // Do not let operators kill the health UI out from under themselves
-  if (
-    (name === 'paradox-health' || name === 'paradox-health.service') &&
-    (action === 'stop' || action === 'disable')
-  ) {
+  const healthUnits = new Set([
+    'pxh',
+    'pxh.service',
+    'paradox-health',
+    'paradox-health.service',
+  ]);
+  if (healthUnits.has(name) && (action === 'stop' || action === 'disable')) {
     return {
       ok: false,
-      message: `Refusing to ${action} paradox-health (would take down this UI). Use restart instead.`,
+      message: `Refusing to ${action} ${name} (would take down this UI). Use restart instead.`,
     };
   }
   try {

@@ -28,6 +28,7 @@ touching the others as long as the MQTT contract holds.
 | **PxT** | Player terminal kiosk | Electron / INI |
 | **Pio** | GPIO-to-MQTT bridge | C++ / INI |
 | **PxB** | Z-Wave / Zigbee / Thread to MQTT bridge | Node.js / INI |
+| **PxS** | **Paradox Speech** — room STT/TTS service (cloud/off-box STT, Piper/cloud TTS, MQTT + WS captions) | Node.js / INI |
 | **PxD** | Operator dashboard — the GM's daily tool, browser-served | Web / room.json |
 | **Mosquitto** | MQTT broker (the message bus) | conf |
 | Rooms | `agent22`, `houdinis-challenge`, `spycatcher` — EDN/media game packages | EDN |
@@ -38,10 +39,10 @@ touching the others as long as the MQTT contract holds.
   Commands flow PxO → PFx (media) and PxO → PxB (radio devices); inputs flow from PFx / PxB / Pio /
   PxT → PxO. Z-Wave/Zigbee sensor events reach PxO via PxB (not via PFx).
 - **PxO** is the brain (game logic). **PFx** is media/audio. **PxB**/**Pio** are hardware bridges.
-  **PxD** is the GM's live surface. **PxP** is the operator/admin layer that configures and manages
-  everything but is **not** part of a running game. **PxH** is the always-on host health beacon
-  (`/health/`, MQTT system alerts) on each room machine — complementary to **PxP-Agent** (Prime's
-  remote management channel).
+  **PxS** is speech (STT/TTS captions and announcements). **PxD** is the GM's live surface. **PxP**
+  is the operator/admin layer that configures and manages everything but is **not** part of a
+  running game. **PxH** is the always-on host health beacon (`/health/`, MQTT system alerts) on
+  each room machine — complementary to **PxP-Agent** (Prime's remote management channel).
 - **Runtime apps start at boot as services**; a venue runs games all day without PxP open.
 
 ## Working conventions (all repos)
@@ -77,7 +78,7 @@ paradox/
     PxP/        Paradox Prime (operator hub)
     PxP-Agent/  Remote management agent (open source; used by PxP)
     PxH/        Paradox Health Monitor (host-local /health/ beacon)
-    PFx/ PFxE/ PxO/ PxC/ PxT/ Pio/ PxB/ PxD/ ...
+    PFx/ PFxE/ PxO/ PxC/ PxT/ Pio/ PxB/ PxS/ PxD/ ...
   rooms/        Game packages
   props/        Prop firmware
   Px-Suite/     Private suite notes / pending / business (internal machines only)

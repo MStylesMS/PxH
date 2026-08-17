@@ -328,7 +328,7 @@ topic_root = paradox
 enabled = false
 [services]
 required = mosquitto,nginx
-optional = paradox-health
+optional = pxh
 user = custom-unit
 [warnings]
 rule.1.pattern = paradox/+/pfx/warnings
@@ -346,7 +346,7 @@ rule.1.color = pfx
     assert.equal(cfg.thresholds.cpuWarnPercent, 80);
     assert.equal(cfg.thresholds.tempCriticalC, 80);
     assert.equal(cfg.thresholds.ramWarnPercent, 80);
-    assert.equal(cfg.apps['paradox-health'], DEFAULT_APP_PATHS['paradox-health']);
+    assert.equal(cfg.apps.pxh, DEFAULT_APP_PATHS.pxh);
     assert.equal(cfg.apps.pxo, DEFAULT_APP_PATHS.pxo);
     unlinkSync(path);
   });
@@ -367,7 +367,7 @@ pfx =
     const cfg = loadConfig(path);
     assert.equal(cfg.apps.pxo, '/custom/PxO');
     assert.equal(cfg.apps.pfx, undefined);
-    assert.equal(cfg.apps['paradox-health'], DEFAULT_APP_PATHS['paradox-health']);
+    assert.equal(cfg.apps.pxh, DEFAULT_APP_PATHS.pxh);
     assert.equal(cfg.actions.allowAppUpdate, true);
     unlinkSync(path);
   });
@@ -395,12 +395,12 @@ describe('appVersions', () => {
     const cfg = {
       services: {
         required: ['pxo', 'nginx'],
-        optional: ['paradox-health'],
+        optional: ['pxh'],
         user: [],
       },
       apps: {
         pxo: '/opt/paradox/apps/PxO',
-        'paradox-health': '/opt/paradox/apps/PxH',
+        pxh: '/opt/paradox/apps/PxH',
         // In apps map but not in services allowlist → excluded
         pxb: '/opt/paradox/apps/PxB',
       },
@@ -408,7 +408,7 @@ describe('appVersions', () => {
     const entries = mappedAppEntries(cfg);
     assert.deepEqual(
       entries.map((e) => e.name),
-      ['paradox-health', 'pxo'],
+      ['pxh', 'pxo'],
     );
   });
 
