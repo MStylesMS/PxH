@@ -13,7 +13,7 @@ MQTT alerts, gated maintenance (disk/IDE prune). Not game logic; not PxP-Agent.
 | PxH | Short / repo / npm package `pxh` |
 | System Health | Operator-facing UI title |
 | `/health/`, `/health-api/` | nginx paths (keep stable) |
-| `paradox-health.service` | systemd unit |
+| `pxh.service` | systemd unit (`paradox-health.service` is a legacy alias) |
 | `pxh.ini` | config |
 
 Former Hub product is **PxP**, not this repo.
@@ -38,7 +38,7 @@ If the workspace has `Px-Suite/` (or `/opt/paradox/Px-Suite`), use it for intern
 - `src/` — Node service (Fastify + optional MQTT)
 - `public/` — System Health static UI
 - `config/pxh.example.ini` — config template
-- `systemd/paradox-health.service` — unit file
+- `systemd/pxh.service` — unit file (`systemd/paradox-health.service` is a legacy alias)
 
 ## MVP priorities
 

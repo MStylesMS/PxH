@@ -50,7 +50,7 @@ unrestricted filesystem deletes.
 
 ```
                     ┌──────────────────────────────────────┐
-                    │  paradox-health.service (PxH / Node) │
+                    │  pxh.service (PxH / Node)            │
                     │  metrics · systemd probe · MQTT      │
                     │  HTTP + WS API (:19090 default)      │
                     │  optional: serve UI itself           │
@@ -66,7 +66,7 @@ unrestricted filesystem deletes.
 |------|------|
 | App | `/opt/paradox/apps/PxH/` |
 | Config | `/opt/paradox/config/pxh.ini` |
-| Unit | `paradox-health.service` |
+| Unit | `pxh.service` (`paradox-health.service` is a legacy alias) |
 | Operator UI URL | Prefer `http://<host>/health/` via nginx; **always** also reachable at `http://<host>:19090/ui/` |
 
 Default bind: `0.0.0.0:19090` (LAN/Tailscale viewing). HTTPS belongs on nginx if the venue already has certs; PxH itself serves HTTP.
@@ -167,7 +167,7 @@ never touch `/opt/paradox` media/apps/configs.
 | Tier | Examples | Behavior |
 |------|----------|----------|
 | **Required** | `mosquitto`, `nginx`, room Paradox units (`pfx`, `pxo`, …) | Failed/inactive → UI critical + MQTT alert |
-| **Optional** | `paradox-health` self, extras | Shown but soft |
+| **Optional** | `pxh` self, extras | Shown but soft |
 | **User-defined** | Operator-added unit names in `pxh.ini` | Same state model |
 
 **States:** `running` | `stopped` | `failed` | `unknown`  
@@ -180,7 +180,7 @@ a **red count badge**; click lists those PIDs (and short cmdlines). Disable with
 `[services] scan_conflicts = false`.
 
 **UI controls (session required):** contextual Start/Stop, Restart, and Enable/Disable.
-Stop/Disable of `paradox-health` itself is refused (would take down the UI).
+Stop/Disable of `pxh` itself is refused (would take down the UI).
 
 ### 7.1 Paradox app versions & updates (Phases 1–2)
 
@@ -191,7 +191,7 @@ poll), PxH runs `git fetch` and reports behind/HEAD for the Services grid.
 **Card:** `Update available.` when behind; gear opens an update modal (PAM session for Apply).
 
 **Apply:** `git fetch` → checkout branch → `git reset --hard <sha>` → `systemctl restart`
-(including self-update of `paradox-health`). Refuses a dirty working tree. Commit SHAs must
+(including self-update of `pxh`). Refuses a dirty working tree. Commit SHAs must
 be ancestors of `origin/<branch>`. Gated by `[actions] allow_app_update`.
 
 Infra units (`mosquitto`, `nginx`) stay systemd-only. Rooms-repo updates and Node-version
@@ -295,7 +295,7 @@ PxD starter `room.json` includes an optional **System Health** link (`/health/` 
 
 ## 13. Acceptance criteria (MVP)
 
-1. `paradox-health` active on Agent22-class install.  
+1. `pxh` active on Agent22-class install.  
 2. `/health/` **or** `:19090/ui/` shows non-null disk metrics with threshold colors.  
 3. Disk warn → MQTT `…/system/alerts` within one publish interval.  
 4. Configured required services show running/stopped/failed.  

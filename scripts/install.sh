@@ -51,11 +51,16 @@ if ! visudo -cf /etc/sudoers.d/paradox-health >/dev/null; then
 fi
 echo "    Installed /etc/sudoers.d/paradox-health"
 
-install -m 644 "$APP_DIR/systemd/paradox-health.service" /etc/systemd/system/paradox-health.service
+install -m 644 "$APP_DIR/systemd/pxh.service" /etc/systemd/system/pxh.service
 systemctl daemon-reload
-systemctl enable --now paradox-health.service
-echo "==> paradox-health.service active"
-systemctl --no-pager --full status paradox-health.service || true
+if systemctl list-unit-files | grep -q '^paradox-health.service'; then
+    systemctl disable --now paradox-health.service 2>/dev/null || true
+    rm -f /etc/systemd/system/paradox-health.service
+    systemctl daemon-reload
+fi
+systemctl enable --now pxh.service
+echo "==> pxh.service active"
+systemctl --no-pager --full status pxh.service || true
 echo ""
 echo "Next: edit $CONFIG_DIR/pxh.ini (machine.id, broker)."
 echo "nginx: merge config/nginx-health.example.conf — /health-api/ → 127.0.0.1:19090, /health/ → UI"

@@ -9,12 +9,12 @@ Type=simple
 User=paradox
 Group=paradox
 WorkingDirectory=/opt/paradox/apps/PxH
-ExecStart=/usr/local/bin/node /opt/paradox/apps/PxH/dist/index.js --config /opt/paradox/config/pxh.ini
-Restart=on-failure
-RestartSec=5
 Environment=NODE_ENV=production
 # PAM auth helper + metrics need a normal home for IDE prune paths
 Environment=HOME=/home/paradox
+ExecStart=/usr/local/bin/node /opt/paradox/apps/PxH/dist/index.js --config /opt/paradox/config/pxh.ini
+Restart=on-failure
+RestartSec=5
 SyslogIdentifier=pxh
 
 [Install]
