@@ -33,6 +33,8 @@ async function systemctlText(args: string[]): Promise<string> {
 function normalizeEnabled(raw: string): RuntimeServiceInfo['enabled'] {
   const e = raw.trim();
   if (e === 'enabled' || e === 'disabled' || e === 'static' || e === 'masked') return e;
+  // systemd reports Alias= / symlink units as "alias"
+  if (e === 'alias' || e.includes('alias')) return 'enabled';
   if (e.includes('enabled')) return 'enabled';
   if (e.includes('disabled')) return 'disabled';
   if (e.includes('masked')) return 'masked';
