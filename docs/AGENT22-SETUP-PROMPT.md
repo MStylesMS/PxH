@@ -10,7 +10,7 @@ Install and enable **Paradox Health Monitor (PxH)** on this Agent 22 host so ope
 
 1. A **System Health** link on the PxD landing page (`/health/`)
 2. Live disk / service alerts in the PxD **System Warnings** pane (`paradox/+/system/alerts`)
-3. `paradox-health.service` running on boot
+3. `pxh.service` running on boot
 
 Reference docs in the clone: `docs/INSTALL.md`, `docs/QUICK-SETUP.md`, `docs/SPEC.md`.  
 Houdini already has a working reference install under `/opt/paradox/apps/PxH` and `/opt/paradox/config/pxh.ini`.
@@ -19,7 +19,7 @@ Houdini already has a working reference install under `/opt/paradox/apps/PxH` an
 
 - App path: `/opt/paradox/apps/PxH`
 - Config: `/opt/paradox/config/pxh.ini`
-- Unit: `paradox-health.service` (user `paradox`)
+- Unit: `pxh.service` (user `paradox`)
 - Node.js **24 LTS** required (`/usr/local/bin/node`; install official binary or NodeSource 24.x if missing)
 - Do **not** invent a separate password store — PAM against local OS users
 - Do **not** break existing PFx / game / nginx / MQTT paths
@@ -85,7 +85,7 @@ cd /opt/paradox/apps/PxH
 sudo bash scripts/install.sh
 ```
 
-This builds the app, installs sudoers, enables `paradox-health.service`, and seeds `pxh.ini` from the example if missing.
+This builds the app, installs sudoers, enables `pxh.service`, and seeds `pxh.ini` from the example if missing.
 
 ### 4. Configure `/opt/paradox/config/pxh.ini` for Agent 22
 
@@ -104,7 +104,7 @@ topic_root = paradox
 [services]
 ; Trim to units that exist on this host (systemctl list-units --type=service)
 required = mosquitto,nginx,pfx
-optional = paradox-health,paradox-speech
+optional = pxh,pxs
 user =
 ; Add room game / bridge units if present, e.g. user = pxo — or Agent22 equivalents
 
@@ -122,8 +122,8 @@ Publish prefix becomes `paradox/agent22/system/{health,disk,services,alerts}`.
 Restart after edits:
 
 ```bash
-sudo systemctl restart paradox-health
-systemctl status paradox-health --no-pager
+sudo systemctl restart pxh
+systemctl status pxh --no-pager
 curl -s http://127.0.0.1:19090/metrics | head
 curl -s http://127.0.0.1:19090/services
 ```
@@ -185,18 +185,18 @@ Confirm the landing page lists **System Health** and that opening it loads the P
 
 ### 7. Optional: paradox-control integration
 
-If this host’s `/opt/paradox/scripts/paradox-control.sh` and `install-services.sh` already know about `paradox-health` (newer trees do), run:
+If this host’s `/opt/paradox/scripts/paradox-control.sh` and `install-services.sh` already know about `pxh` (newer trees do), run:
 
 ```bash
 /opt/paradox/scripts/paradox-control.sh status
 /opt/paradox/scripts/paradox-control.sh logs health
 ```
 
-Otherwise `systemctl` / `journalctl -u paradox-health` is enough.
+Otherwise `systemctl` / `journalctl -u pxh` is enough.
 
 ### 8. Acceptance checklist
 
-- [ ] `systemctl is-active paradox-health` → `active`
+- [ ] `systemctl is-active pxh` → `active`
 - [ ] `http://<host>:19090/ui/` and (if nginx merged) `http://<host>/health/` show non-null disk %
 - [ ] MQTT retained health visible: `mosquitto_sub -t 'paradox/agent22/system/health' -C 1 -W 35`
 - [ ] PxD landing shows **System Health**

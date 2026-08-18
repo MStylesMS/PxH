@@ -90,7 +90,7 @@ backend = nut
 nut_ups = cyberpower@127.0.0.1
 ```
 
-4. Restart `paradox-health`. System Health UPS tile should show runtime minutes and a
+4. Restart `pxh`. System Health UPS tile should show runtime minutes and a
    two-line subtitle like:
 
    ```
@@ -105,7 +105,7 @@ See [SPEC.md](SPEC.md) §9–10 and [API.md](API.md) for UPS telemetry. Soften N
 
 ## 9. Smoke checklist (§13)
 
-- [ ] `paradox-health` is active
+- [ ] `pxh` is active
 - [ ] UI shows non-null disk % with color bands
 - [ ] Crossing warn publishes `…/system/alerts`
 - [ ] Required services show running/stopped/failed

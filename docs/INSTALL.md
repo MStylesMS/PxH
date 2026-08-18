@@ -21,7 +21,7 @@ The installer:
 1. Syncs the app tree to `/opt/paradox/apps/PxH` (keeps `.git` so version inventory works)
 2. Runs `npm install`, `npm run build`, then `npm prune --omit=dev`
 3. Writes `/opt/paradox/config/pxh.ini` from the example if missing
-4. Installs `paradox-health.service` and enables it
+4. Installs `pxh.service` and enables it (stops any leftover `paradox-health.service`)
 5. Installs `/etc/sudoers.d/paradox-health` (NOPASSWD allowlist for maintenance actions)
 
 ## Required: sudoers
@@ -62,7 +62,7 @@ HTTPS is optional and belongs on nginx (venue cert). PxH itself listens HTTP on 
 ## Verify
 
 ```bash
-systemctl status paradox-health
+systemctl status pxh
 curl -s http://127.0.0.1:19090/metrics | head
 curl -s http://127.0.0.1:19090/services
 ```

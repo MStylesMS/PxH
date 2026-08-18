@@ -12,7 +12,7 @@ dev machine (`moscow-dev` / `moscow-dev.local`) so operators get:
 
 1. A **System Health** link on the PxD landing page (`/health/`)
 2. Live disk / service alerts in the PxD **System Warnings** pane (`paradox/+/system/alerts`)
-3. `paradox-health.service` running on boot
+3. `pxh.service` running on boot
 
 Reference docs in the clone: `docs/INSTALL.md`, `docs/QUICK-SETUP.md`, `docs/SPEC.md`.  
 Working reference installs already exist on Houdini (`/opt/paradox/apps/PxH`,
@@ -33,7 +33,7 @@ Working reference installs already exist on Houdini (`/opt/paradox/apps/PxH`,
 
 - App path: `/opt/paradox/apps/PxH`
 - Config: `/opt/paradox/config/pxh.ini`
-- Unit: `paradox-health.service` (user `paradox`)
+- Unit: `pxh.service` (user `paradox`)
 - Node.js **24 LTS** required (`/usr/local/bin/node`; install official binary or NodeSource 24.x if missing)
 - Do **not** invent a separate password store — PAM against local OS users
 - Do **not** break existing PFx / game / nginx / MQTT / PxT terminal paths
@@ -54,7 +54,7 @@ node -v || true
 id paradox
 ls /opt/paradox/apps
 ls /opt/paradox/rooms
-systemctl is-active mosquitto nginx pfx pxb pxo paradox-health 2>/dev/null || true
+systemctl is-active mosquitto nginx pfx pxb pxo pxh 2>/dev/null || true
 readlink -f /opt/paradox/config/pfx.ini 2>/dev/null || true
 ls /etc/nginx/sites-enabled 2>/dev/null
 # Find SpyCatcher PxD source + packaged HTML
@@ -118,7 +118,7 @@ cd /opt/paradox/apps/PxH
 sudo bash scripts/install.sh
 ```
 
-This builds the app, installs sudoers, enables `paradox-health.service`, and
+This builds the app, installs sudoers, enables `pxh.service`, and
 seeds `pxh.ini` from the example if missing.
 
 ### 4. Configure `/opt/paradox/config/pxh.ini` for moscow-dev
@@ -140,7 +140,7 @@ topic_root = paradox
 ; Trim to units that actually exist on this host:
 ;   systemctl list-units --type=service --all | grep -Ei 'pfx|pxo|pxb|nginx|mosquitto|game'
 required = mosquitto,nginx,pfx
-optional = paradox-health
+optional = pxh
 user =
 ; Add SpyCatcher game / bridge / orchestrator units if present on this Pi
 ; (examples only — verify names first): pxo, pxb, spycatcher-game, etc.
@@ -154,8 +154,8 @@ that URL the same way PFx does in `pfx.ini`.
 Restart after edits:
 
 ```bash
-sudo systemctl restart paradox-health
-systemctl status paradox-health --no-pager
+sudo systemctl restart pxh
+systemctl status pxh --no-pager
 curl -s http://127.0.0.1:19090/metrics | head
 curl -s http://127.0.0.1:19090/services
 ```
@@ -231,19 +231,19 @@ loads the PxH UI (`/health/` or `:19090/ui/`).
 ### 7. Optional: paradox-control integration
 
 If this host’s `/opt/paradox/scripts/paradox-control.sh` already knows about
-`paradox-health`:
+`pxh`:
 
 ```bash
 /opt/paradox/scripts/paradox-control.sh status
 /opt/paradox/scripts/paradox-control.sh logs health
 ```
 
-Otherwise `systemctl` / `journalctl -u paradox-health` is enough.
+Otherwise `systemctl` / `journalctl -u pxh` is enough.
 
 ### 8. Acceptance checklist
 
 - [ ] `hostname` is `moscow-dev` (or document the actual name if different)
-- [ ] `systemctl is-active paradox-health` → `active`
+- [ ] `systemctl is-active pxh` → `active`
 - [ ] `http://moscow-dev.local:19090/ui/` and (if nginx merged)
       `http://moscow-dev.local/health/` show non-null disk %
 - [ ] MQTT retained health visible:
