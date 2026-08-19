@@ -1,7 +1,7 @@
 # Paradox Health Monitor (PxH) — Functional Specification
 
 _Status: MVP_  
-_Last updated: 2026-07-22_  
+_Last updated: 2026-08-19_  
 _Product:_ **Paradox Health Monitor** (**PxH**)
 
 > Former **Paradox Hub** is now **Paradox Prime (PxP)**. This repo’s **PxH** means Health Monitor only.
@@ -91,6 +91,8 @@ limits, auth, prune. Full sample: [config/pxh.example.ini](../config/pxh.example
 | `[props]` | announce topic(s) (default `paradox/props`), history |
 | `[ui]` | theme `day` / `night` / `auto`, refresh interval |
 | `[actions]` | gates, `session_hours`, `allowed_users` |
+| `[ups]` | optional USB UPS via NUT / apcupsd |
+| `[displays]` | HDMI connector cards (`enabled`, default true) |
 | `[prune]` | `schedule` (`weekly` \| `low_disk` \| `manual_only`), `interval_hours` |
 
 ---
@@ -217,14 +219,20 @@ reporting remain follow-on work.
 
 ### 9.1 Metrics cards
 
-Host, uptime, CPU, temp, GPU mem, RAM, **disk**, apt updates, **UPS** (after Updates; no sudo
-tile), plus a **Services** grid (same ~⅓ width cards as the warning panels) with contextual
-unit controls and, for Paradox apps in `[apps]`, an update gear / “Update available.” modal
-for branch/commit checkout.
+Host, uptime, CPU, temp, GPU mem, RAM, **swap**, **disk**, apt updates, **HDMI**
+(one card per DRM `HDMI-A-*` connector, after Updates), **UPS**, plus a **sudo**
+NOPASSWD tile and a **Services** grid (same ~⅓ width cards as the warning panels)
+with contextual unit controls and, for Paradox apps in `[apps]`, an update gear /
+“Update available.” modal for branch/commit checkout.
+
+Native `title=` tooltips on metric cards (CPU load meaning, RAM MemAvailable, HDMI
+DRM/CEC details, etc.).
 
 **CPU / Temp / RAM / Disk** cards use ok/warn/critical value colors from `[thresholds]`
 (defaults: CPU 80%/95%, temp 70°C/80°C, RAM 80%/95%, disk 85%/95% plus free-GB floors).
 Temp `n/a` stays uncolored. **UPS** colors from `[ups]` battery/runtime bands (Plan 14).
+**HDMI** Unplugged = warn; Awake / Sleeping / Connected = ok. Make/model from EDID in
+the subtitle when the sink is connected; CEC power is cached (not every 15s poll).
 
 UPS card: primary = estimated runtime minutes; two-line subtitle —
 line 1 `Batt. {charge}% · {On AC|On battery|…}`, line 2 `Load {load}% · {watts} W`
@@ -265,7 +273,7 @@ With `topic_root=paradox` (default) and machine `id`:
 
 | Topic | Retained | Content |
 |-------|----------|---------|
-| `paradox/<id>/system/health` | yes | Metrics snapshot (includes `ups` when enabled) |
+| `paradox/<id>/system/health` | yes | Metrics snapshot (includes `ups` and `displays` when enabled) |
 | `paradox/<id>/system/disk` | yes | diskRoot + level |
 | `paradox/<id>/system/ups` | yes | UPS snapshot (`UpsInfo`) |
 | `paradox/<id>/system/services` | yes | Unit states summary |

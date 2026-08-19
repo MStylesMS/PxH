@@ -54,6 +54,27 @@ export interface UpsInfo {
   level: ThresholdLevel;
 }
 
+export type DisplayPower = 'on' | 'standby' | 'off' | 'unknown';
+export type DisplayConnection = 'connected' | 'disconnected' | 'unknown';
+export type DisplayCardValue = 'Awake' | 'Sleeping' | 'Connected' | 'Unplugged';
+
+export interface DisplayInfo {
+  port: string;
+  drmName: string;
+  connected: boolean;
+  status: DisplayConnection;
+  enabled: string | null;
+  dpms: string | null;
+  power: DisplayPower;
+  make: string | null;
+  model: string | null;
+  serial: string | null;
+  cecDevice: string | null;
+  mode: string | null;
+  value: DisplayCardValue;
+  level: ThresholdLevel;
+}
+
 export interface TopConsumer {
   path: string;
   label: string;
@@ -97,6 +118,7 @@ export interface MetricsSnapshot {
   aptUpgrade?: AptUpgradeMetrics;
   sudoNopasswd: boolean | null;
   ups: UpsInfo;
+  displays: DisplayInfo[];
   topConsumers?: TopConsumer[];
 }
 
@@ -295,6 +317,9 @@ export interface PxhConfig {
     batteryCriticalPercent: number;
     runtimeWarnMinutes: number;
     runtimeCriticalMinutes: number;
+  };
+  displays: {
+    enabled: boolean;
   };
   prune: {
     schedule: 'weekly' | 'low_disk' | 'manual_only';

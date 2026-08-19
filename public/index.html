@@ -114,6 +114,7 @@
     .card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 0.2rem; line-height: 1.35; }
     .card.warn-progress { border-color: var(--warn); }
     .card.warn-progress .sub { color: var(--warn); font-weight: 600; }
+    .card[title] { cursor: help; }
     .ok .value { color: var(--ok); }
     .warn .value { color: var(--warn); }
     .critical .value { color: var(--crit); }
@@ -481,8 +482,9 @@
       return 'ok';
     }
 
-    function card(label, value, sub, cls) {
-      return `<article class="card ${cls || ''}"><div class="label">${label}</div>` +
+    function card(label, value, sub, cls, title) {
+      const t = title ? ` title="${escapeHtml(title)}"` : '';
+      return `<article class="card ${cls || ''}"${t}><div class="label">${label}</div>` +
         `<div class="value">${value}</div>` +
         (sub ? `<div class="sub">${sub}</div>` : '') +
         `</article>`;
@@ -511,16 +513,15 @@
     }
 
     function upsCard(u) {
+      const upsTitle = 'USB UPS via NUT or apcupsd. Primary value is estimated runtime minutes.';
       if (!u || (u.status === 'none' && !u.present)) {
-        return card('UPS', 'n/a', 'UPS not configured');
+        return card('UPS', 'n/a', 'UPS not configured', '', upsTitle);
       }
       if (u.status === 'no_comms' && !u.present) {
-        return card('UPS', 'n/a', 'No UPS data', 'warn');
+        return card('UPS', 'n/a', 'No UPS data', 'warn', upsTitle);
       }
       const val =
         u.runtimeMinutes != null ? `${u.runtimeMinutes} min` : 'n/a';
-      // Line 1: Batt. 100% · On AC
-      // Line 2: Load 19% · 125 W  (when known)
       const line1 = [];
       if (u.batteryChargePercent != null) line1.push(`Batt. ${u.batteryChargePercent}%`);
       line1.push(upsStatusLabel(u.status));
@@ -530,7 +531,29 @@
       const sub = line2.length
         ? `${line1.join(' · ')}<br>${line2.join(' · ')}`
         : line1.join(' · ');
-      return card('UPS', val, sub, levelClass(u.level));
+      const extra = [u.mfr, u.model, u.backend].filter(Boolean).join(' · ');
+      return card('UPS', val, sub, levelClass(u.level), extra ? `${upsTitle} ${extra}` : upsTitle);
+    }
+
+    function displayCard(d) {
+      const make = d.make || '';
+      const model = d.model || '';
+      let identity = '';
+      if (make && model && model.toLowerCase() !== make.toLowerCase()) {
+        identity = `${make} · ${model}`;
+      } else {
+        identity = make || model;
+      }
+      const sub = d.connected ? (identity || 'sink connected') : 'no sink';
+      const tip = [
+        d.drmName,
+        d.enabled ? `enabled=${d.enabled}` : null,
+        d.dpms ? `dpms=${d.dpms}` : null,
+        d.power && d.power !== 'unknown' ? `power=${d.power}` : null,
+        d.cecDevice,
+        d.serial ? `serial ${d.serial}` : null,
+      ].filter(Boolean).join(' · ');
+      return card(d.port || 'HDMI', d.value || 'n/a', sub, levelClass(d.level), tip || 'HDMI connector');
     }
 
     function renderMetrics(m) {
@@ -540,27 +563,30 @@
       const diskSub = disk
         ? `${disk.usedGb} / ${disk.totalGb} GB<br>${disk.availableGb} GB free`
         : 'disk metrics unavailable';
+      const hdmiCards = Array.isArray(m.displays) ? m.displays.map(displayCard) : [];
       document.getElementById('cards').innerHTML = [
-        card('Host', m.hostname || '—', m.timestamp),
-        card('Uptime', formatUptime(m.uptimeSeconds)),
-        card('CPU', `${m.cpuPercent}%`, `load ${m.load?.one} / ${m.load?.five} / ${m.load?.fifteen}`, levelClass(m.cpuLevel)),
+        card('Host', m.hostname || '—', m.timestamp, '', 'This machine’s hostname and last metrics timestamp.'),
+        card('Uptime', formatUptime(m.uptimeSeconds), null, '', 'Time since the host last booted.'),
+        card('CPU', `${m.cpuPercent}%`, `load ${m.load?.one} / ${m.load?.five} / ${m.load?.fifteen}`, levelClass(m.cpuLevel), 'CPU utilization. Subtitle is 1 / 5 / 15 minute load averages.'),
         card(
           'Temp',
           m.cpuTempC != null ? `${m.cpuTempC}°C` : 'n/a',
           null,
           m.cpuTempC != null ? levelClass(m.tempLevel) : '',
+          'CPU temperature. Warn / critical bands from [thresholds].',
         ),
-        card('GPU mem', m.gpuMemMb != null ? `${m.gpuMemMb} MB` : 'n/a'),
+        card('GPU mem', m.gpuMemMb != null ? `${m.gpuMemMb} MB` : 'n/a', null, '', 'Raspberry Pi GPU memory split (vcgencmd get_mem gpu).'),
         card(
           'RAM',
           `${m.ram?.usedPercent}%`,
           `${m.ram?.usedMb} / ${m.ram?.totalMb} MB used (excl. cache)`,
           levelClass(m.ramLevel),
+          'Used = total − MemAvailable (reclaimable cache is not counted as used).',
         ),
         (() => {
           const s = m.swap;
-          if (!s) return card('Swap', 'n/a', 'swap metrics unavailable');
-          if (s.totalMb === 0) return card('Swap', 'none', 'no swap configured');
+          if (!s) return card('Swap', 'n/a', 'swap metrics unavailable', '', 'Swap usage from /proc/swaps.');
+          if (s.totalMb === 0) return card('Swap', 'none', 'no swap configured', '', 'No swap devices in /proc/swaps.');
           const lines = [];
           if (s.zram) lines.push(`zram ${s.zram.usedMb} / ${s.zram.totalMb} MB`);
           if (s.disk) lines.push(`disk ${s.disk.usedMb} / ${s.disk.totalMb} MB`);
@@ -568,9 +594,11 @@
             'Swap',
             `${s.usedPercent}%`,
             lines.length ? lines.join('<br>') : `${s.usedMb} / ${s.totalMb} MB`,
+            '',
+            'zram vs disk swap from /proc/swaps.',
           );
         })(),
-        card('Disk', diskVal, diskSub, diskCls),
+        card('Disk', diskVal, diskSub, diskCls, 'Root filesystem used percent. Warn / critical from [thresholds] (percent and free-GB floors).'),
         (() => {
           const up = m.aptUpgrade;
           if (up?.inProgress) {
@@ -582,15 +610,19 @@
                 : m.aptUpdatesAvailable != null
                   ? String(m.aptUpdatesAvailable)
                   : '…';
-            return card('Updates', value, 'Update in progress…', 'warn-progress');
+            return card('Updates', value, 'Update in progress…', 'warn-progress', 'apt packages being upgraded.');
           }
           return card(
             'Updates',
             m.aptUpdatesAvailable != null ? String(m.aptUpdatesAvailable) : 'n/a',
+            null,
+            '',
+            'Count of apt packages that can be upgraded (cached daily).',
           );
         })(),
+        ...hdmiCards,
         upsCard(m.ups),
-        card('sudo', m.sudoNopasswd === true ? 'OK' : m.sudoNopasswd === false ? 'missing' : '?', 'NOPASSWD'),
+        card('sudo', m.sudoNopasswd === true ? 'OK' : m.sudoNopasswd === false ? 'missing' : '?', 'NOPASSWD', m.sudoNopasswd === false ? 'warn' : '', 'Whether the paradox user can run allowlisted maintenance commands without a password.'),
       ].join('');
       if (!actionBusy) {
         document.getElementById('status').textContent =

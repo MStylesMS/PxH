@@ -135,6 +135,7 @@ export function loadConfig(configPath: string): PxhConfig {
   const ui = raw.ui ?? {};
   const pr = raw.prune ?? {};
   const u = raw.ups ?? {};
+  const disp = raw.displays ?? {};
 
   const hostName = osHostname();
   const machineId = str(m.id) || hostName;
@@ -246,6 +247,9 @@ export function loadConfig(configPath: string): PxhConfig {
       batteryCriticalPercent: num(u.battery_critical_percent, 20),
       runtimeWarnMinutes: num(u.runtime_warn_minutes, 15),
       runtimeCriticalMinutes: num(u.runtime_critical_minutes, 5),
+    },
+    displays: {
+      enabled: bool(disp.enabled, true),
     },
     prune: {
       schedule,

@@ -20,6 +20,16 @@ import {
   resolveRealPowerWatts,
 } from '../src/metrics/ups.js';
 import {
+  parseEdidBuffer,
+  parseCecPowerStatus,
+  powerFromDpms,
+  classifyDisplay,
+  listDrmHdmiConnectors,
+  collectDisplays,
+  resetDisplayCacheForTests,
+} from '../src/metrics/displays.js';
+import type { DrmConnector } from '../src/metrics/displays.js';
+import {
   mqttSystemTopic,
   mqttSystemPrefix,
   DEFAULT_APP_PATHS,
@@ -760,5 +770,84 @@ describe('parseUpgradeStatusJson', () => {
   it('returns null for invalid JSON or missing inProgress', () => {
     assert.equal(parseUpgradeStatusJson('{'), null);
     assert.equal(parseUpgradeStatusJson('{"phase":"upgrade"}'), null);
+  });
+});
+
+describe('displays', () => {
+  const samsungEdid = Buffer.from(
+    '00ffffffffffff004c2d4870000e0001011e0103804627780a23ada4544d99260f474abdee0081c00101010101010101010101010101662156aa51001e30468f33000a252100001e011d007251d01e206e2855000a252100001e000000fd00184b0f4417000a202020202020000000fc0053414d53554e470a20202020200189',
+    'hex',
+  );
+
+  it('parses Samsung EDID make/model', () => {
+    const edid = parseEdidBuffer(samsungEdid);
+    assert.equal(edid.ok, true);
+    assert.equal(edid.manufacturerId, 'SAM');
+    assert.equal(edid.manufacturerHint, 'Samsung');
+    assert.equal(edid.modelName, 'SAMSUNG');
+  });
+
+  it('parses CEC power status and DRM dpms', () => {
+    assert.equal(parseCecPowerStatus('power status: on'), 'on');
+    assert.equal(parseCecPowerStatus('power status: standby'), 'standby');
+    assert.equal(parseCecPowerStatus('nope'), 'unknown');
+    assert.equal(powerFromDpms('On'), 'on');
+    assert.equal(powerFromDpms('Standby'), 'standby');
+  });
+
+  it('classifies unplugged / awake / sleeping', () => {
+    const base: DrmConnector = {
+      drmName: 'card1-HDMI-A-1',
+      port: 'HDMI-1',
+      status: 'connected',
+      enabled: 'enabled',
+      dpms: 'On',
+      connected: true,
+      cecDevice: '/dev/cec0',
+      edid: parseEdidBuffer(samsungEdid),
+    };
+    const awake = classifyDisplay(base, 'on');
+    assert.equal(awake.value, 'Awake');
+    assert.equal(awake.level, 'ok');
+    assert.equal(awake.make, 'Samsung');
+    const sleeping = classifyDisplay(base, 'standby');
+    assert.equal(sleeping.value, 'Sleeping');
+    const unplugged = classifyDisplay({ ...base, connected: false, status: 'disconnected', edid: null }, null);
+    assert.equal(unplugged.value, 'Unplugged');
+    assert.equal(unplugged.level, 'warn');
+  });
+
+  it('lists HDMI connectors from a fixture DRM tree', () => {
+    const root = resolve(tmpdir(), `pxh-drm-${Date.now()}`);
+    const a1 = resolve(root, 'card1-HDMI-A-1');
+    const a2 = resolve(root, 'card1-HDMI-A-2');
+    mkdirSync(a1, { recursive: true });
+    mkdirSync(a2, { recursive: true });
+    writeFileSync(resolve(a1, 'status'), 'connected\n');
+    writeFileSync(resolve(a1, 'enabled'), 'enabled\n');
+    writeFileSync(resolve(a1, 'dpms'), 'On\n');
+    writeFileSync(resolve(a1, 'edid'), samsungEdid);
+    writeFileSync(resolve(a2, 'status'), 'disconnected\n');
+    writeFileSync(resolve(a2, 'enabled'), 'disabled\n');
+    try {
+      const list = listDrmHdmiConnectors(root);
+      assert.equal(list.length, 2);
+      assert.equal(list[0].port, 'HDMI-1');
+      assert.equal(list[0].connected, true);
+      assert.equal(list[0].edid?.manufacturerHint, 'Samsung');
+      assert.equal(list[1].port, 'HDMI-2');
+      assert.equal(list[1].connected, false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('collectDisplays returns [] when disabled', async () => {
+    resetDisplayCacheForTests();
+    const out = await collectDisplays({ displays: { enabled: false } } as PxhConfig, {
+      skipCec: true,
+      drmRoot: resolve(tmpdir(), 'no-such-drm'),
+    });
+    assert.deepEqual(out, []);
   });
 });

@@ -17,7 +17,7 @@ Maintenance `/actions/*` and prune preview require a PAM session (local OS user)
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/` or `/health` | `{ status, version, name }` |
-| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `cpuLevel` / `tempLevel` / `ramLevel` / `diskLevel`, **ups**, optional `aptUpgrade`, optional `topConsumers` |
+| `GET` | `/metrics` | Host snapshot including **diskRoot**, temps, RAM, load, apt, `cpuLevel` / `tempLevel` / `ramLevel` / `diskLevel`, **ups**, **displays**, optional `aptUpgrade`, optional `topConsumers` |
 | `GET` | `/services` | Configured systemd units with `state`, `tier`, `enabled`, `pid`, `extraProcesses` |
 | `GET` | `/runtime` | Alias of `/services` (prototype compatibility) |
 | `GET` | `/apps/versions` | Paradox app git inventory (fetch `origin`, compare current branch; on-demand) |
@@ -105,6 +105,35 @@ Load 22% · 145 W
 ```
 
 (Omit the second line when load and watts are both unknown.)
+
+### `displays` (when `[displays] enabled`)
+
+One object per DRM HDMI connector (`HDMI-A-*`), including disconnected ports. Empty array on Windows or when disabled.
+
+```json
+[
+  {
+    "port": "HDMI-1",
+    "drmName": "card1-HDMI-A-1",
+    "connected": true,
+    "status": "connected",
+    "enabled": "enabled",
+    "dpms": "On",
+    "power": "on",
+    "make": "Samsung",
+    "model": "SAMSUNG",
+    "serial": null,
+    "cecDevice": "/dev/cec0",
+    "mode": null,
+    "value": "Awake",
+    "level": "ok"
+  }
+]
+```
+
+`value`: `Awake` | `Sleeping` | `Connected` | `Unplugged`.  
+`power`: `on` | `standby` | `off` | `unknown` (CEC cached ~90s; DRM `dpms` is the cheap fallback).  
+UI: one card per port after Updates, before UPS. Unplugged = warn.
 
 ### `/services` item shape
 

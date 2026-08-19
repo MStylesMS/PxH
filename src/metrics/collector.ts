@@ -11,6 +11,7 @@ import type { DiskRoot, MetricsSnapshot, PxhConfig, ThresholdLevel, TopConsumer 
 import { getCachedAptUpdateCount } from './aptUpdateCache.js';
 import { getAptUpgradeMetrics } from '../actions/upgradeStatus.js';
 import { collectUps } from './ups.js';
+import { collectDisplays } from './displays.js';
 import { readSwapInfo } from './swap.js';
 
 const execFileAsync = promisify(execFile);
@@ -182,7 +183,7 @@ export async function collectMetrics(
   cfg: PxhConfig,
   opts?: { topConsumers?: boolean },
 ): Promise<MetricsSnapshot> {
-  const [load, mem, time, diskRoot, cpuTemp, gpuMem, sudoNopasswd, aptUpgrade, ups, swap] =
+  const [load, mem, time, diskRoot, cpuTemp, gpuMem, sudoNopasswd, aptUpgrade, ups, swap, displays] =
     await Promise.all([
       si.currentLoad(),
       si.mem(),
@@ -194,6 +195,7 @@ export async function collectMetrics(
       getAptUpgradeMetrics(),
       collectUps(cfg),
       readSwapInfo(),
+      collectDisplays(cfg),
     ]);
   const aptUpdates = getCachedAptUpdateCount();
 
@@ -220,6 +222,7 @@ export async function collectMetrics(
     aptUpdatesAvailable: aptUpdates,
     sudoNopasswd,
     ups,
+    displays,
   };
   if (aptUpgrade) {
     snap.aptUpgrade = aptUpgrade;
