@@ -295,7 +295,8 @@ Default patterns (example ini):
 
 - `paradox/+/pfx/warnings`, `paradox/+/pfxe/warnings` → color `pfx`
 - `paradox/+/pxo/warnings` → `pxo`
-- `paradox/+/pio/warnings` → `pio`
+- `paradox/+/pxio/warnings`, `paradox/+/gpio/warnings` → `pxio`
+- `paradox/+/pio/warnings` → `pxio` (legacy topic before Pio→PxIO rename)
 - `paradox/+/pxb/warnings`, `paradox/+/pxb/+/warnings` → `pxb`
 - `paradox/+/pxt/warnings` → `pxt`
 - `paradox/+/speech/warnings` → `pxs` (Paradox Speech / PxS)

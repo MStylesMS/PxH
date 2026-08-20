@@ -26,7 +26,7 @@ touching the others as long as the MQTT contract holds.
 | **PxO** | Game orchestration engine (state machine, sequences) | Node.js / INI + EDN |
 | **PxC** | Configurable clock app framework | React / INI |
 | **PxT** | Player terminal kiosk | Electron / INI |
-| **Pio** | GPIO-to-MQTT bridge | C++ / INI |
+| **PxIO** | GPIO-to-MQTT bridge | C++ / INI |
 | **PxB** | Z-Wave / Zigbee / Thread to MQTT bridge | Node.js / INI |
 | **PxS** | **Paradox Speech** — room STT/TTS service (cloud/off-box STT, Piper/cloud TTS, MQTT + WS captions) | Node.js / INI |
 | **PxD** | Operator dashboard — the GM's daily tool, browser-served | Web / room.json |
@@ -36,9 +36,9 @@ touching the others as long as the MQTT contract holds.
 ## How the pieces relate
 
 - **MQTT is the contract.** Topic structure `{baseTopic}/{commands|events|state|warnings}` is sacred.
-  Commands flow PxO → PFx (media) and PxO → PxB (radio devices); inputs flow from PFx / PxB / Pio /
+  Commands flow PxO → PFx (media) and PxO → PxB (radio devices); inputs flow from PFx / PxB / PxIO /
   PxT → PxO. Z-Wave/Zigbee sensor events reach PxO via PxB (not via PFx).
-- **PxO** is the brain (game logic). **PFx** is media/audio. **PxB**/**Pio** are hardware bridges.
+- **PxO** is the brain (game logic). **PFx** is media/audio. **PxB**/**PxIO** are hardware bridges.
   **PxS** is speech (STT/TTS captions and announcements). **PxD** is the GM's live surface. **PxP**
   is the operator/admin layer that configures and manages everything but is **not** part of a
   running game. **PxH** is the always-on host health beacon (`/health/`, MQTT system alerts) on
@@ -78,7 +78,7 @@ paradox/
     PxP/        Paradox Prime (operator hub)
     PxP-Agent/  Remote management agent (open source; used by PxP)
     PxH/        Paradox Health Monitor (host-local /health/ beacon)
-    PFx/ PFxE/ PxO/ PxC/ PxT/ Pio/ PxB/ PxS/ PxD/ ...
+    PFx/ PFxE/ PxO/ PxC/ PxT/ PxIO/ PxB/ PxS/ PxD/ ...
   rooms/        Game packages
   props/        Prop firmware
   Px-Suite/     Private suite notes / pending / business (internal machines only)

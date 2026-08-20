@@ -187,7 +187,7 @@ Per-app detail: `apps/PFx/docs/MQTT_API.md`, `apps/PFx/docs/CONFIG_INI.md`.
 | Concern | Doc |
 |---------|-----|
 | PxO game / zone API | `apps/PxO/docs/MQTT_API.md` |
-| PFx / PFxE / Pio / PxB / PxC / PxT / **PxS** | each app’s `docs/MQTT_API.md` (or CONFIG / SPEC) |
+| PFx / PFxE / PxIO / PxB / PxC / PxT / **PxS** | each app’s `docs/MQTT_API.md` (or CONFIG / SPEC) |
 | PxH host MQTT | `apps/PxH/docs/API.md`, `SPEC.md` |
 | PxD topicRoot / warningTopics | `apps/PxD/docs/ROOMS.md` |
 | SpyCatcher full map | `rooms/spycatcher/docs/MQTT-TOPICS.md` |

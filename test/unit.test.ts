@@ -721,6 +721,7 @@ describe('processMatch', () => {
       cmdlineMatchesUnit('pfx', '/usr/local/bin/node /opt/paradox/apps/PFx/pfx.js --config /x'),
       true,
     );
+    assert.equal(cmdlineMatchesUnit('pxio', '/usr/local/bin/pxio --config /opt/paradox/config/pxio.ini'), true);
     assert.equal(cmdlineMatchesUnit('pio', '/usr/local/bin/pio --config /opt/paradox/config/pio.ini'), true);
     assert.equal(cmdlineMatchesUnit('pio', 'something else'), false);
     assert.equal(cmdlineMatchesUnit('nginx', '/usr/sbin/nginx -g daemon on;'), true);
