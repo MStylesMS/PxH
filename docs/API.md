@@ -7,6 +7,11 @@ _Status: MVP_ · See [SPEC.md](SPEC.md)
 
 UI also at `http://<host>:19090/ui/` when `serve_ui=true` (fallback if nginx is down).
 
+**Prefixed reverse proxy** (e.g. TFD `tfd.local/pxh-generator/health/`): the UI derives the
+API root from the page path — `/<prefix>/health/` talks to `/<prefix>/health-api/`
+(and `/<prefix>/health-api/ws`). Do not hard-code `/health-api` when the UI is not
+served from `/health/`.
+
 **Auth:** Viewing (metrics, panels, WebSocket) is open on the trusted LAN/Tailscale network.
 Maintenance `/actions/*` and prune preview require a PAM session (local OS user).
 

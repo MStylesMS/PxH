@@ -210,6 +210,7 @@ export const DEFAULT_APP_PATHS: Record<string, string> = {
   pfx: '/opt/paradox/apps/PFx',
   pfxe: '/opt/paradox/apps/PFxE',
   pxo: '/opt/paradox/apps/PxO',
+  pxm: '/opt/paradox/apps/PxM',
   pxio: '/opt/paradox/apps/PxIO',
   /** @deprecated legacy unit/path alias */
   pio: '/opt/paradox/apps/PxIO',

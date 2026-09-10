@@ -27,6 +27,10 @@ const MATCHERS: Record<string, (cmd: string) => boolean> = {
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PFx\/pfx\.js(?:\s|$)/.test(c),
   pxo: (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxO\/src\/game\.js(?:\s|$)/.test(c),
+  pxm: (c) =>
+    /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxM\/src\/pxm\.js(?:\s|$)/.test(c),
+  'tfd-pxm': (c) =>
+    /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxM\/src\/pxm\.js(?:\s|$)/.test(c),
   /** Legacy unit name (pre-rename); still recognize game.js processes. */
   'moscow-game': (c) =>
     /^\s*(?:\S*\/)?node(?:js)?\s+\S*\/apps\/PxO\/src\/game\.js(?:\s|$)/.test(c),

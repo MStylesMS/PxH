@@ -206,7 +206,9 @@ reporting remain follow-on work.
 **Decision (approved):**
 
 1. **Primary:** nginx proxies `/health-api/` → `127.0.0.1:19090` and aliases `/health/` → static UI
-   (or proxies `/health/` → PxH `/ui/`).
+   (or proxies `/health/` → PxH `/ui/`). A front-door host may expose sister-chamber PxH under
+   a prefix (`/<prefix>/health/` + `/<prefix>/health-api/`); the UI must keep that prefix on
+   fetch and WebSocket URLs.
 2. **Always-on fallback:** PxH binds API+UI on `:19090` (default `0.0.0.0`).
 3. **Do not** auto-bind :80/:443 when nginx fails. When UI is loaded via `:19090`, the page
    calls `GET /reachability/nginx-health` (server-side probe of `http://127.0.0.1/health/`) and

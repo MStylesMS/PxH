@@ -385,8 +385,11 @@
 
   <script>
     const API = (function resolveApi() {
-      if (location.pathname.startsWith('/health')) return '/health-api';
-      return '';
+      // Keep in sync with src/ui/resolveApiBase.ts
+      // /health/ → /health-api
+      // /pxh-generator/health/ → /pxh-generator/health-api
+      const m = location.pathname.match(/^(.*?)\/health(?:\/|$)/);
+      return m ? `${m[1]}/health-api` : '';
     })();
     document.getElementById('api-base').textContent = API || '(direct)';
 
