@@ -14,7 +14,8 @@ inside distributed PxH.
 | Document | Purpose |
 |----------|---------|
 | [AI-INSTRUCTIONS.md](AI-INSTRUCTIONS.md) | Sanitized whole-suite AI brief (system map, conventions) |
-| [MQTT-CONTRACT.md](MQTT-CONTRACT.md) | MQTT topic trees, retain rules, PFx/PxB process namespaces, prop announce vs state, host `system/*` vs room warnings |
+| [MQTT-CONTRACT.md](MQTT-CONTRACT.md) | MQTT topic trees, retain rules, PFx/PxB process namespaces, prop announce vs state, host `system/*` vs room warnings, media pack (`mediaId`) |
+| [ROOM-MEDIA-CATALOG.md](ROOM-MEDIA-CATALOG.md) | Soft standard: one `media/CATALOG.md` per room (paths, descriptions, speech transcripts) |
 
 Add new suite-wide **public** standards here as separate markdown files and list them in this table.
 

@@ -182,7 +182,114 @@ Per-app detail: `apps/PFx/docs/MQTT_API.md`, `apps/PFx/docs/CONFIG_INI.md`.
 
 ---
 
-## 9. Where to read more
+## 9. Media pack (`mediaId`)
+
+Optional **language / restyle pack** selected by PxM (or a GM publishing the same commands). Players
+insert a positive integer folder name between the configured media root and the relative `file`.
+Omit the field and path resolution is **bit-identical to today**.
+
+Room file inventory (what is on disk, transcripts): [ROOM-MEDIA-CATALOG.md](ROOM-MEDIA-CATALOG.md).
+That document is **not** the PxM pack catalog (`id` / `name` / `language`).
+
+### Path rule (PFx, PFxE, PxT)
+
+When a pack is **not** set (omit / `null` / `""` after a clear):
+
+```text
+{media_dir}/{file}
+```
+
+When a pack **is** set:
+
+```text
+{media_dir}/{id}/{file}
+```
+
+`id` is the catalog Version ID, stringified with no leading zeros (`1` not `01`). `file` may contain
+subdirectories (`elevator/vo_01_intro.mp3`). Absolute `file` values skip the insert.
+
+INI `media_dir` / `media_base_dir` stays the room `media/` **root**, never `…/media/1`. EDN `:file`,
+NVS FX maps, and PxT variant keys never contain the pack id.
+
+**Sanitize `mediaId`:** JSON number or decimal string matching `^[1-9][0-9]{0,8}$`. Reject `0`,
+leading zeros, `/`, `..`, empty, or slugs like `v1`. On reject: ignore the command, publish
+`warnings`, keep the previous pack. Players do not look up the catalog; they only insert the integer.
+
+PxC does **not** prefix `media_dir`. A pack maps to a prebuilt clock URL / bundle. PxS uses the
+catalog language code; it has no media path. PxO echoes `mediaId` on start / passport / state / JSONL
+and does **not** rewrite `:file`.
+
+### Command `switchMedia`
+
+Published to each **supporting process** `{base}/commands` (PFx **zone** topic that already accepts
+`playVideo`, plus PxT / PxC / PxS process commands).
+
+```json
+{
+  "command": "switchMedia",
+  "mediaId": 2,
+  "refresh": false
+}
+```
+
+| Field | Required | Default | Meaning |
+|-------|----------|---------|---------|
+| `mediaId` | yes | — | Catalog Version ID (integer). To clear the pack (legacy `{media_dir}/{file}`), send `mediaId: null` on `switchMedia` only. |
+| `refresh` | no | `false` | If `true`, reload currently active stills / beds / loops / wait video from the new pack. If `false`, keep what is playing; the next `play*` / `setImage` uses the new pack. |
+
+Unknown extra fields are ignored (suite norm). Apps that have not implemented the command ignore it
+(unknown command) and must **not** tear down the process.
+
+PxS may also receive `language` from the pack catalog (`en` / `es` / …). File-based apps do not need
+`language`.
+
+### Command `start` (and chamber `start`)
+
+Supporting processes **and** PxO `start` accept the same optional fields:
+
+```json
+{
+  "command": "start",
+  "mediaId": 2,
+  "refresh": false
+}
+```
+
+When omitted, start does not change the process’s retained pack. When present, it is equivalent to
+`switchMedia` immediately before the rest of start.
+
+PxM attaches the **group’s** `mediaId` on every chamber `start` / handoff `start`.
+
+### Retained `{base}/state`
+
+If a pack has ever been set, include it on the retained snapshot (and on change):
+
+```json
+{
+  "mediaId": 2
+}
+```
+
+Omit `mediaId` entirely when unset so old UIs and old rooms see today’s payload.
+
+Also publish a non-retained `{base}/events` receipt:
+
+```json
+{
+  "event": "mediaSwitched",
+  "mediaId": 2,
+  "refresh": false,
+  "refreshed": ["background", "default_image"]
+}
+```
+
+`refreshed` is the list of active layers actually replaced (empty when `refresh` is false).
+
+Missing files: existing “file not found” warning. Do not crash. Do not invent a silent fallback pack.
+
+---
+
+## 10. Where to read more
 
 | Concern | Doc |
 |---------|-----|
@@ -190,12 +297,13 @@ Per-app detail: `apps/PFx/docs/MQTT_API.md`, `apps/PFx/docs/CONFIG_INI.md`.
 | PFx / PFxE / PxIO / PxB / PxC / PxT / **PxS** | each app’s `docs/MQTT_API.md` (or CONFIG / SPEC) |
 | PxH host MQTT | `apps/PxH/docs/API.md`, `SPEC.md` |
 | PxD topicRoot / warningTopics | `apps/PxD/docs/ROOMS.md` |
+| Room media file inventory | [ROOM-MEDIA-CATALOG.md](ROOM-MEDIA-CATALOG.md) |
 | SpyCatcher full map | `rooms/spycatcher/docs/MQTT-TOPICS.md` |
 | Prop firmware | each prop’s `docs/api.md` / `functional-spec.md` |
 
 ---
 
-## 10. Propagation duty
+## 11. Propagation duty
 
 If you change this file (or discover that another repo documents a conflicting suite MQTT
 meaning):

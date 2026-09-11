@@ -96,4 +96,6 @@ Suite-wide **public** contracts and this brief live in **this folder** (not a si
 them before changing MQTT topics or shared conventions. If you change a standard, update the file
 under PxH `docs/standards/` first and propagate to other repos' docs in the same work.
 
-Start with [MQTT-CONTRACT.md](MQTT-CONTRACT.md) for topic trees and retain rules.
+Start with [MQTT-CONTRACT.md](MQTT-CONTRACT.md) for topic trees, retain rules, and the optional
+media pack (`mediaId`) path insert. Room packages should keep a single [media/CATALOG.md](ROOM-MEDIA-CATALOG.md)
+inventory (soft: required for new work, not a hard CI failure on existing rooms).
